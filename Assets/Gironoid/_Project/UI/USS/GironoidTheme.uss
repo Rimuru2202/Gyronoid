@@ -1,0 +1,955 @@
+/* GironoidTheme.uss — единая тема под WebGL/Android
+   Улучшено:
+   - читаемость (контраст/обводка/тень/размеры)
+   - один шрифт на весь UI
+   - стили Hangar под Figma (слоты на корабле, full-screen)
+   - декор topbar линиями
+*/
+
+/* ============================= */
+/* Base app layout */
+/* ============================= */
+
+.app-root {
+    flex-grow: 1;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+
+    background-color: rgb(10, 12, 20);
+    padding: 14px;
+}
+
+/* Hangar: чуть меньше паддинги, чтобы не было "пустых краёв" */
+.app-root--hangar {
+    padding: 10px;
+}
+
+/* Shop (если используется отдельным экраном) */
+.app-root--shop {
+    padding: 14px;
+}
+
+/* ============================= */
+/* Global font + readability */
+/* ============================= */
+
+/* ЕДИНЫЙ ШРИФТ НА ВСЮ ИГРУ
+   FontAsset лежит в: Assets/Resources/Fonts/GironoidMainFont.asset
+   Поэтому в USS путь: resource("Fonts/GironoidMainFont")
+*/
+.app-root Label,
+.app-root Button {
+    -unity-font-definition: resource("Fonts/GironoidMainFont");
+
+    /* База читаемости для всего текста */
+    color: rgba(248, 252, 255, 0.98);
+
+    /* Обводка: делает текст читабельным на темном/светящихся линиях */
+    -unity-text-outline-width: 1.8px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.95);
+
+    /* Тень: мягко отделяет текст от фона (если движок игнорирует — просто не применится) */
+    text-shadow: 0 2px 3px rgba(0,0,0,0.72);
+}
+
+/* Чуть разные настройки для Label/Button (кнопки обычно требуют более контрастно) */
+.app-root Label {
+    color: rgba(242, 250, 255, 0.96);
+    -unity-text-outline-width: 1.7px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.94);
+    text-shadow: 0 2px 3px rgba(0,0,0,0.70);
+}
+
+.app-root Button {
+    color: rgba(250, 252, 255, 0.98);
+    -unity-text-outline-width: 1.9px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.96);
+    text-shadow: 0 2px 3px rgba(0,0,0,0.74);
+}
+
+/* Опциональная плашка под текст (для подсказок/описаний, которые висят "в воздухе") */
+.text-plate {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+
+    background-color: rgba(0, 0, 0, 0.26);
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(255,255,255,0.06);
+    border-right-color: rgba(255,255,255,0.06);
+    border-top-color: rgba(255,255,255,0.06);
+    border-bottom-color: rgba(255,255,255,0.06);
+}
+
+/* ============================= */
+/* Topbar */
+/* ============================= */
+
+.topbar {
+    height: 72px;
+    flex-direction: row;
+    align-items: center;
+
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.topbar-left {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+}
+
+.topbar-center {
+    flex-grow: 1;
+    justify-content: center;
+    align-items: center;
+}
+
+.topbar-right {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.energy-stack {
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+/* Декор topbar линиями (как в Figma) */
+.topbar--hangar,
+.topbar--decor {
+    position: relative;
+    overflow: hidden;
+}
+
+/* ВАЖНО: picking-mode в USS не задаётся.
+   Поставьте в UXML для topbar-decor-lines: picking-mode="Ignore"
+*/
+.topbar-decor-lines {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.topbar-line {
+    position: absolute;
+    left: -8px;
+    right: -8px;
+    height: 2px;
+    background-color: rgba(90, 200, 255, 0.55);
+    opacity: 0.75;
+}
+
+.topbar-line--a { top: 18px; }
+.topbar-line--b { top: 30px; opacity: 0.45; }
+
+/* ============================= */
+/* Content / Footer */
+/* ============================= */
+
+.content {
+    flex-grow: 1;
+    min-height: 0;
+    justify-content: center;
+    align-items: center;
+}
+
+.content--stretch {
+    justify-content: flex-start;
+    align-items: stretch;
+}
+
+.footer {
+    margin-top: 10px;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.footer--center {
+    justify-content: center;
+}
+
+.footer-btn {
+    width: 360px;
+}
+
+/* ============================= */
+/* Typography */
+/* ============================= */
+
+.brand {
+    font-size: 36px;
+    -unity-font-style: bold;
+    color: rgba(250, 252, 255, 0.99);
+
+    -unity-text-outline-width: 2.4px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.98);
+
+    text-shadow: 0 3px 5px rgba(0,0,0,0.76);
+}
+
+.small-text {
+    margin-top: 0px;
+    font-size: 16px;
+    line-height: 20px;
+
+    /* “малый” текст делаем чуть мягче, но не серым */
+    color: rgba(232, 244, 255, 0.94);
+
+    -unity-text-outline-width: 1.7px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.95);
+
+    text-shadow: 0 2px 3px rgba(0,0,0,0.72);
+}
+
+.h2like {
+    font-size: 22px;
+    -unity-font-style: bold;
+    margin-bottom: 6px;
+
+    color: rgba(250, 252, 255, 0.99);
+
+    -unity-text-outline-width: 2.2px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.98);
+
+    text-shadow: 0 3px 4px rgba(0,0,0,0.75);
+}
+
+.bold { -unity-font-style: bold; }
+
+/* ВАЖНО: opacity ухудшает читаемость (обводка тоже тускнеет).
+   Поэтому dim делаем через цвет, а не opacity.
+*/
+.dim {
+    opacity: 1;
+    color: rgba(195, 214, 235, 0.78);
+}
+
+.wrap { white-space: normal; }
+
+/* ============================= */
+/* Panels */
+/* ============================= */
+
+.center-panel {
+    width: 100%;
+    max-width: 520px;
+    padding: 18px;
+
+    background-color: rgba(20, 26, 44, 0.78);
+
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(120, 190, 255, 0.25);
+    border-right-color: rgba(120, 190, 255, 0.25);
+    border-top-color: rgba(120, 190, 255, 0.25);
+    border-bottom-color: rgba(120, 190, 255, 0.25);
+}
+
+.center-panel--wide { max-width: 980px; }
+
+.panel {
+    padding: 16px;
+
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+
+    background-color: rgba(24, 28, 45, 0.76);
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(255,255,255,0.10);
+    border-right-color: rgba(255,255,255,0.10);
+    border-top-color: rgba(255,255,255,0.10);
+    border-bottom-color: rgba(255,255,255,0.10);
+}
+
+/* Плашка заголовка (центр topbar) */
+.title-plate {
+    padding-left: 18px;
+    padding-right: 18px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+
+    background-color: rgba(12, 16, 28, 0.65);
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(90, 200, 255, 0.45);
+    border-right-color: rgba(90, 200, 255, 0.45);
+    border-top-color: rgba(90, 200, 255, 0.45);
+    border-bottom-color: rgba(90, 200, 255, 0.45);
+}
+
+.title-plate--small {
+    padding-left: 14px;
+    padding-right: 14px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+/* ============================= */
+/* Buttons */
+/* ============================= */
+
+.icon-btn {
+    width: 54px;
+    height: 54px;
+
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+
+    background-color: rgba(120, 190, 255, 0.20);
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(120, 190, 255, 0.55);
+    border-right-color: rgba(120, 190, 255, 0.55);
+    border-top-color: rgba(120, 190, 255, 0.55);
+    border-bottom-color: rgba(120, 190, 255, 0.55);
+
+    -unity-font-style: bold;
+    font-size: 22px;
+}
+
+.btn {
+    height: 64px;
+
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+
+    background-color: rgba(130, 90, 255, 0.30);
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(170, 140, 255, 0.62);
+    border-right-color: rgba(170, 140, 255, 0.62);
+    border-top-color: rgba(170, 140, 255, 0.62);
+    border-bottom-color: rgba(170, 140, 255, 0.62);
+
+    font-size: 20px;
+    -unity-font-style: bold;
+
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+.btn--secondary {
+    background-color: rgba(120, 190, 255, 0.20);
+
+    border-left-color: rgba(120, 190, 255, 0.55);
+    border-right-color: rgba(120, 190, 255, 0.55);
+    border-top-color: rgba(120, 190, 255, 0.55);
+    border-bottom-color: rgba(120, 190, 255, 0.55);
+}
+
+.btn--selected {
+    background-color: rgba(130, 90, 255, 0.46);
+
+    border-left-color: rgba(210, 190, 255, 0.78);
+    border-right-color: rgba(210, 190, 255, 0.78);
+    border-top-color: rgba(210, 190, 255, 0.78);
+    border-bottom-color: rgba(210, 190, 255, 0.78);
+}
+
+/* ============================= */
+/* Layout helpers */
+/* ============================= */
+
+.vstack {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.split-row {
+    flex-direction: row;
+    flex-grow: 1;
+    min-height: 0;
+    gap: 12px;
+    padding: 0;
+}
+
+.split-col {
+    flex-grow: 1;
+    min-width: 320px;
+    min-height: 0;
+}
+
+.row-wrap {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.grow {
+    flex-grow: 1;
+    min-width: 160px;
+}
+
+/* ============================= */
+/* Lists */
+/* ============================= */
+
+.list {
+    flex-grow: 1;
+    min-height: 0;
+}
+
+/* ============================= */
+/* Slots (generic) */
+/* ============================= */
+
+.slot-btn {
+    width: 56px;
+    height: 52px;
+
+    background-color: rgba(255,255,255,0.08);
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(255,255,255,0.16);
+    border-right-color: rgba(255,255,255,0.16);
+    border-top-color: rgba(255,255,255,0.16);
+    border-bottom-color: rgba(255,255,255,0.16);
+}
+
+.slot-btn--selected {
+    background-color: rgba(120, 190, 255, 0.24);
+
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+
+    border-left-color: rgba(120, 190, 255, 0.78);
+    border-right-color: rgba(120, 190, 255, 0.78);
+    border-top-color: rgba(120, 190, 255, 0.78);
+    border-bottom-color: rgba(120, 190, 255, 0.78);
+}
+
+/* ============================= */
+/* Hangar (Figma) */
+/* ============================= */
+
+.hangar-content { padding-top: 6px; }
+
+.hangar-screen {
+    flex-grow: 1;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.hangar-main {
+    flex-direction: row;
+    flex-grow: 1;
+    min-height: 0;
+    gap: 12px;
+}
+
+/* Left and right columns fill screen */
+.hangar-left { flex-grow: 1.1; min-height: 0; }
+.hangar-right { flex-grow: 1.0; min-height: 0; }
+
+/* Section title ("Звездолёт") */
+.section-title {
+    font-size: 22px;
+    -unity-font-style: bold;
+    margin-bottom: 10px;
+
+    color: rgba(250, 252, 255, 0.99);
+    -unity-text-outline-width: 2.2px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.98);
+    text-shadow: 0 3px 4px rgba(0,0,0,0.75);
+}
+
+.hangar-left-inner { flex-grow: 1; min-height: 0; }
+
+/* Ship row: preview + stats */
+.ship-row { flex-direction: row; gap: 12px; min-height: 0; }
+
+/* Ship preview block */
+.ship-preview {
+    flex-grow: 1.25;
+    min-height: 0;
+    position: relative;
+
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+
+    background-color: rgba(10, 12, 20, 0.45);
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(120, 190, 255, 0.35);
+    border-right-color: rgba(120, 190, 255, 0.35);
+    border-top-color: rgba(120, 190, 255, 0.35);
+    border-bottom-color: rgba(120, 190, 255, 0.35);
+
+    padding: 12px;
+}
+
+.ship-art {
+    flex-grow: 1;
+    min-height: 220px;
+
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+
+    background-color: rgba(255,255,255,0.03);
+}
+
+/* Slot labels (left text) */
+.ship-slot-labels {
+    position: absolute;
+    left: 10px;
+    top: 40px;
+    width: 210px;
+}
+
+.ship-slot-hint {
+    margin-top: 10px;
+    font-size: 15px;
+    line-height: 19px;
+
+    /* вместо opacity — цветом */
+    color: rgba(230, 240, 255, 0.92);
+
+    -unity-text-outline-width: 1.6px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.94);
+
+    text-shadow: 0 2px 3px rgba(0,0,0,0.70);
+}
+
+.ship-slot-hint--w { margin-top: 0px; }
+.ship-slot-hint--s { }
+.ship-slot-hint--e { }
+
+/* Slots layer */
+.ship-slots-layer {
+    position: absolute;
+    left: 220px; /* смещение к вертикальной линии слотов, подгоните под ваш арт корабля */
+    top: 52px;
+    width: 90px;
+    height: 240px;
+}
+
+/* Ship slots are hidden by default. Show by adding class ship-slot-on */
+.ship-slot-btn { position: absolute; display: none; }
+.ship-slot-on { display: flex; }
+
+/* Positions (под Figma: вертикальная колонка) */
+.ship-slot--w0 { left: 0px; top: 0px; }
+.ship-slot--s0 { left: 0px; top: 70px; }
+.ship-slot--e0 { left: 0px; top: 140px; }
+
+/* Второе оружие (Mk4): появится если добавить ship-slot-on */
+.ship-slot--w1 { left: 0px; top: 34px; }
+
+/* Запасные позиции (если когда-то понадобятся) */
+.ship-slot--w2 { left: 0px; top: 104px; }
+.ship-slot--w3 { left: 0px; top: 174px; }
+.ship-slot--s1 { left: 60px; top: 70px; }
+.ship-slot--s2 { left: 60px; top: 104px; }
+.ship-slot--s3 { left: 60px; top: 140px; }
+.ship-slot--e1 { left: 60px; top: 140px; }
+.ship-slot--e2 { left: 60px; top: 174px; }
+.ship-slot--e3 { left: 60px; top: 208px; }
+.ship-slot--m0 { left: 60px; top: 0px; }
+.ship-slot--m1 { left: 60px; top: 34px; }
+.ship-slot--m2 { left: 60px; top: 208px; }
+.ship-slot--m3 { left: 0px; top: 208px; }
+
+/* Stats block */
+.ship-stats { flex-grow: 1; min-height: 0; }
+.ship-upgrade-btn { height: 58px; }
+
+/* Ship switch bottom */
+.ship-switch {
+    margin-top: 10px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.ship-switch-btn { width: 88px; height: 54px; }
+
+.ship-switch-title {
+    font-size: 22px;
+    -unity-font-style: bold;
+
+    color: rgba(250, 252, 255, 0.99);
+    -unity-text-outline-width: 2.2px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.98);
+    text-shadow: 0 3px 4px rgba(0,0,0,0.75);
+
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+/* Right side layout */
+.hangar-right-head { margin-bottom: 8px; }
+
+.hangar-right-body {
+    flex-direction: row;
+    flex-grow: 1;
+    min-height: 0;
+    gap: 12px;
+}
+
+.hangar-inv { flex-grow: 1.05; min-height: 0; }
+.hangar-details { flex-grow: 0.95; min-height: 0; }
+
+.equip-btn { height: 56px; }
+
+/* Action bar bottom */
+.actionbar {
+    margin-top: 10px;
+    flex-direction: row;
+    gap: 10px;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.action-btn {
+    flex-grow: 1;
+    min-width: 170px;
+    height: 64px;
+
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+
+    padding-left: 14px;
+    padding-right: 14px;
+}
+
+.action-btn-icon {
+    width: 34px;
+    height: 34px;
+    background-color: rgba(255,255,255,0.06);
+
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(255,255,255,0.14);
+    border-right-color: rgba(255,255,255,0.14);
+    border-top-color: rgba(255,255,255,0.14);
+    border-bottom-color: rgba(255,255,255,0.14);
+}
+
+/* Текст внутри action-кнопок */
+.action-btn-text {
+    font-size: 18px;
+    -unity-font-style: bold;
+
+    color: rgba(250, 252, 255, 0.99);
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.98);
+    text-shadow: 0 3px 4px rgba(0,0,0,0.75);
+}
+
+/* Footer big done button */
+.hangar-footer { margin-top: 10px; }
+
+.hangar-done-btn {
+    width: 520px;
+    height: 78px;
+    font-size: 22px;
+
+    -unity-text-outline-width: 2.4px;
+    -unity-text-outline-color: rgba(0,0,0,0.98);
+    text-shadow: 0 3px 5px rgba(0,0,0,0.78);
+}
+
+/* ============================= */
+/* Modal (legacy / generic) */
+/* ============================= */
+
+.modal-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+}
+
+.modal-layer.is-open { display: flex; }
+
+.modal-dim {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.72);
+}
+
+.modal-panel {
+    position: relative;
+    width: 96%;
+    max-width: 1080px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 48px;
+    padding: 16px;
+
+    background-color: rgba(20, 26, 44, 0.92);
+
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(120, 190, 255, 0.28);
+    border-right-color: rgba(120, 190, 255, 0.28);
+    border-top-color: rgba(120, 190, 255, 0.28);
+    border-bottom-color: rgba(120, 190, 255, 0.28);
+}
+
+.modal-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.modal-header-left { flex-direction: column; flex-grow: 1; }
+
+/* ============================= */
+/* Modal (Hangar embedded shopModal) — ВАЖНОЕ ДОБАВЛЕНИЕ */
+/* ============================= */
+
+/* Корневой элемент модалки в ангаре: <VisualElement name="shopModal" class="modal-root"> */
+.modal-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+
+    display: none;
+
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+}
+
+/* Если когда-то захотите открывать классом (опционально) */
+.modal-root.is-open { display: flex; }
+
+/* Фон магазина (картинка), отдельным слоем */
+.modal-bg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+
+    background-color: rgb(10, 12, 20);
+}
+
+/* Затемнение + блокировка кликов */
+.modal-backdrop {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+
+    background-color: rgba(0, 0, 0, 0.72);
+}
+
+/* Полноэкранное окно магазина */
+.modal-window {
+    position: relative;
+    flex-grow: 1;
+
+    width: 100%;
+    height: 100%;
+
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+}
+
+/* ============================= */
+/* Tutorial overlay */
+/* ============================= */
+
+.tutorial-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
+}
+
+.tutorial-blocker {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.72);
+}
+
+.tutorial-highlight {
+    position: absolute;
+
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+
+    border-left-color: rgba(120, 190, 255, 0.85);
+    border-right-color: rgba(120, 190, 255, 0.85);
+    border-top-color: rgba(120, 190, 255, 0.85);
+    border-bottom-color: rgba(120, 190, 255, 0.85);
+
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+
+    background-color: rgba(120, 190, 255, 0.08);
+}
+
+.tutorial-arrow {
+    position: absolute;
+    font-size: 42px;
+
+    color: rgba(245, 250, 255, 0.98);
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.95);
+
+    text-shadow: 0 3px 5px rgba(0,0,0,0.78);
+}
+
+.tutorial-bubble {
+    position: absolute;
+    max-width: 460px;
+    padding: 12px;
+
+    background-color: rgba(20, 26, 44, 0.92);
+
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+
+    border-left-color: rgba(120, 190, 255, 0.25);
+    border-right-color: rgba(120, 190, 255, 0.25);
+    border-top-color: rgba(120, 190, 255, 0.25);
+    border-bottom-color: rgba(120, 190, 255, 0.25);
+}
+
+.tutorial-bubble-text {
+    font-size: 16px;
+    line-height: 20px;
+    color: rgba(245, 250, 255, 0.99);
+    white-space: normal;
+
+    -unity-text-outline-width: 1.8px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.95);
+
+    text-shadow: 0 2px 3px rgba(0,0,0,0.72);
+}
+
+/* ============================= */
+/* Runtime Skin overrides */
+/* ============================= */
+
+/* Чтобы USS-фоны не конфликтовали с UISkin спрайтами */
+.skin-enabled .btn,
+.skin-enabled .icon-btn,
+.skin-enabled .panel,
+.skin-enabled .center-panel,
+.skin-enabled .modal-panel,
+.skin-enabled .slot-btn,
+.skin-enabled .title-plate {
+    background-color: rgba(0,0,0,0);
+
+    border-left-width: 0px;
+    border-right-width: 0px;
+    border-top-width: 0px;
+    border-bottom-width: 0px;
+}

@@ -1,0 +1,54 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/Gironoid/_Project/UI/USS/GironoidTheme.uss?fileID=7433441132597879392&amp;guid=fc9f20816bcfe4b449526fac985697d0&amp;type=3#GironoidTheme" />
+
+    <ui:VisualElement name="root" class="app-root" style="background-color: rgba(0, 0, 0, 0); padding: 12px;">
+
+        <!-- TOP HUD BAR -->
+        <ui:VisualElement name="topBar" class="topbar panel topbar--decor" style="margin-bottom: 6px;">
+            <ui:VisualElement class="topbar-left">
+                <ui:Label name="lblTimer" text="Время: 00:00" class="small-text bold" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="topbar-center">
+                <ui:VisualElement name="hudCenterPlate" class="title-plate title-plate--small">
+                    <ui:Label name="lblLives" text="Жизни: 3" class="small-text" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="topbar-right">
+                <ui:Label name="lblKills" text="Метеориты: 0/0" class="small-text" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="topbar-decor-lines">
+                <ui:VisualElement class="topbar-line topbar-line--a" />
+                <ui:VisualElement class="topbar-line topbar-line--b" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- INTRO PANEL -->
+        <ui:VisualElement name="introPanel" class="modal-layer">
+            <ui:VisualElement class="modal-dim" />
+            <ui:VisualElement class="modal-panel panel center-panel vstack center-panel--wide">
+                <ui:Label name="lblIntroTitle" text="Вылет" class="brand" />
+                <ui:Label name="lblIntroObjective" text="Задача: --" class="small-text wrap" />
+                <ui:VisualElement style="height: 10px;" />
+                <ui:Button name="btnIntroStart" text="Вылет" class="btn footer-btn" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- RESULT PANEL -->
+        <ui:VisualElement name="resultPanel" class="modal-layer">
+            <ui:VisualElement class="modal-dim" />
+            <ui:VisualElement class="modal-panel panel center-panel vstack center-panel--wide">
+                <ui:Label name="lblResultTitle" text="Результат" class="brand" />
+                <ui:Label name="lblResultDetails" text="--" class="small-text wrap" />
+                <ui:VisualElement style="height: 10px;" />
+                <ui:VisualElement class="hstack">
+                    <ui:Button name="btnResultRetry" text="Повторить" class="btn btn--secondary" />
+                    <ui:Button name="btnResultExit" text="Выйти" class="btn" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,48 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/Gironoid/_Project/UI/USS/GironoidTheme.uss?fileID=7433441132597879392&amp;guid=fc9f20816bcfe4b449526fac985697d0&amp;type=3#GironoidTheme" />
+
+    <ui:VisualElement name="root" class="app-root">
+
+        <!-- TOPBAR -->
+        <ui:VisualElement class="topbar panel topbar--decor">
+            <ui:VisualElement class="topbar-left">
+                <ui:Button name="btnBack" text="←" class="icon-btn" />
+                <ui:Button name="btnHangar" text="⚙" class="icon-btn" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="topbar-center">
+                <ui:VisualElement name="titlePlate" class="title-plate">
+                    <ui:Label name="lblTitle" text="Звёздная карта" class="brand" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="topbar-right">
+                <ui:VisualElement class="energy-stack">
+                    <ui:Label name="lblEnergy" text="Энергия: --" class="small-text" />
+                    <ui:Label name="lblEnergyTimer" class="small-text" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="topbar-decor-lines">
+                <ui:VisualElement class="topbar-line topbar-line--a" />
+                <ui:VisualElement class="topbar-line topbar-line--b" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- CONTENT -->
+        <ui:VisualElement class="content">
+            <ui:VisualElement class="center-panel vstack">
+                <ui:Label name="lblCurrentPlanet" text="Текущая планета: --" class="small-text" />
+                <ui:Button name="btnPlanetEarth" text="Земля" class="btn btn--secondary" />
+                <ui:Button name="btnPlanetEfilon" text="Эфилон" class="btn" />
+                <ui:Label name="lblHint" text="Выберите планету." class="small-text wrap" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- FOOTER -->
+        <ui:VisualElement class="footer">
+            <ui:Button name="btnPrimary" text="..." class="btn footer-btn" />
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

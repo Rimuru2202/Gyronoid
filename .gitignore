@@ -1,0 +1,130 @@
+# ============================
+# Unity generated folders
+# ============================
+[Ll]ibrary
+[Tt]emp
+[Oo]bj
+[Bb]uild
+[Bb]uilds
+[Ll]ogs
+[Uu]ser[Ss]ettings
+[Mm]emoryCaptures
+[Rr]ecordings
+
+# Crash  diagnostics
+sysinfo.txt
+
+# ============================
+# OS  Editor junk
+# ============================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ============================
+# IDEs (Visual Studio  Rider  VS Code)
+# ============================
+.vs
+.idea
+.suo
+.user
+.userprefs
+.csproj
+.unityproj
+.sln
+.sln.iml
+.booproj
+.svd
+.pdb
+.mdb
+.opendb
+.VC.db
+
+# VS Code (опционально если не хочешь хранить настройки)
+.vscode
+.history
+
+# ============================
+# Unity auto-generated files
+# ============================
+.pidb
+.pidb.meta
+.booproj.meta
+.sln.meta
+.csproj.meta
+.unityproj.meta
+
+# ============================
+# Packages (важно не игнорим manifest.json)
+# ============================
+# Если используешь UPM (Packagesmanifest.json), его НУЖНО коммитить.
+# Эти файлы обычно тоже стоит коммитить
+# Packagespackages-lock.json
+# Поэтому здесь ничего не игнорим целиком для Packages.
+
+# ============================
+# Build artifacts  outputs
+# ============================
+.apk
+.aab
+.app
+.exe
+.dll
+.pdb
+.so
+.dylib
+.bundle
+.a
+.lib
+.ipa
+.xcarchive
+# IDE / C# project files (Unity generates these)
+*.csproj
+*.sln
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+
+.vs/
+.idea/
+*.DotSettings
+
+
+# ============================
+# Unity Asset Server  Cache (если встречается)
+# ============================
+[Uu]nity[Pp]ackage[Mm]anager
+.npm
+.yarn
+pnpm-lock.yaml
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# ============================
+# Addressables (опционально)
+# Если не хочешь хранить собранные бандлыкэш
+# ============================
+[Aa]ssets[Aa]ddressableAssetsData.bin
+[Aa]ssets[Aa]ddressableAssetsData.hash
+[Aa]ssets[Aa]ddressableAssetsData.json
+# ВНИМАНИЕ если у тебя Addressables конфиги в этих папках — проверь перед включением.
+
+# ============================
+# JetBrains Rider plugin for Unity (опционально)
+# ============================
+# Rider generates these
+# .idea.idea..dir
+# already covered by .idea
+
+# ============================
+# Unity Collaborate (если вдруг)
+# ============================
+.collabignore
+
+# ============================
+# End
+# ============================

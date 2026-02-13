@@ -1,0 +1,3 @@
+﻿Build path: C:/games/Arkanoid_Build
+Build number: 61
+PluginYG version: 2.007

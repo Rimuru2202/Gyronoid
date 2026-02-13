@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 68d2476bb54e48f8b836bb0b962b7680, type: 3}
+  m_Name: ItemCatalog
+  m_EditorClassIdentifier: 
+  StarterWeaponDefinitionId: WPN_START_PULSE
+  StarterEngineDefinitionId: ENG_START_ION
+  Items:
+  - Id: WPN_START_PULSE
+    Type: 1
+    NameRu: "\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u043F\u0443\u0448\u043A\u0430"
+    Icon: {fileID: 21300000, guid: ad28608eb10d30d45a28051f910f236c, type: 3}
+    Damage: 25
+    FireRate: 0.2
+    EnergyPerShot: 0
+    ShieldMaxBonus: 0
+    ShieldRegenBonus: 0
+    MoveSpeedBonus: 0
+    AccelerationBonus: 0
+    DamageMultiplier: 0
+    FireRateMultiplier: 0
+  - Id: ENG_START_ION
+    Type: 2
+    NameRu: "\u0411\u0430\u0437\u043E\u0432\u044B\u0439 \u0434\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C"
+    Icon: {fileID: 21300000, guid: fbc13c02d710f334ca9015c04dc95dd9, type: 3}
+    Damage: 0
+    FireRate: 0
+    EnergyPerShot: 0
+    ShieldMaxBonus: 0
+    ShieldRegenBonus: 0
+    MoveSpeedBonus: 12
+    AccelerationBonus: 7
+    DamageMultiplier: 0
+    FireRateMultiplier: 0
+  - Id: SHD_BASIC
+    Type: 3
+    NameRu: "\u0411\u0430\u0437\u043E\u0432\u044B\u0439 \u0449\u0438\u0442"
+    Icon: {fileID: 0}
+    Damage: 0
+    FireRate: 0
+    EnergyPerShot: 0
+    ShieldMaxBonus: 15
+    ShieldRegenBonus: 1.2
+    MoveSpeedBonus: 0
+    AccelerationBonus: 0
+    DamageMultiplier: 0
+    FireRateMultiplier: 0
+  SalvageRules:
+  - Type: 1
+    Quality: 0
+    Gain:
+      Tokens: 0
+      Iron: 15
+      Copper: 0
+      Silver: 0

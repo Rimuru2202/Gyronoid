@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 79d626b5f90b7494f9f5c75c6aea75be, type: 3}
+  m_Name: EnergyConfig
+  m_EditorClassIdentifier: 
+  BaseEnergyCap: 20
+  BaseRegenIntervalSeconds: 180
+  TankCapBonusByLevel: 00000000050000000a0000000f00000014000000
+  CapacitorRegenIntervalSecondsByLevel: b4000000a5000000960000008700000078000000
+  MinRegenIntervalSeconds: 30

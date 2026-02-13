@@ -1,0 +1,57 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/Gironoid/_Project/UI/USS/GironoidTheme.uss?fileID=7433441132597879392&amp;guid=fc9f20816bcfe4b449526fac985697d0&amp;type=3#GironoidTheme" />
+
+    <ui:VisualElement name="root" class="app-root">
+
+        <!-- TOPBAR -->
+        <ui:VisualElement class="topbar panel topbar--decor">
+            <ui:VisualElement class="topbar-left">
+                <ui:Button name="btnBack" text="←" class="icon-btn" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="topbar-center">
+                <ui:VisualElement name="titlePlate" class="title-plate">
+                    <ui:Label name="lblTitle" text="Уровни" class="brand" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="topbar-right">
+                <ui:Label name="lblEnergy" text="Энергия: --" class="small-text" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="topbar-decor-lines">
+                <ui:VisualElement class="topbar-line topbar-line--a" />
+                <ui:VisualElement class="topbar-line topbar-line--b" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- CONTENT -->
+        <ui:VisualElement class="content content--stretch">
+            <ui:VisualElement class="center-panel vstack center-panel--wide">
+                <ui:Label name="lblPlanet" text="Планета: --" class="small-text" />
+                <ui:Label name="lblPlayerLevel" text="Уровень игрока: --" class="small-text" />
+                <ui:Label name="lblDetails" text="Выберите уровень или испытание." class="small-text wrap" />
+
+                <ui:VisualElement style="height: 10px;" />
+
+                <ui:VisualElement class="split-row">
+                    <ui:VisualElement class="split-col panel">
+                        <ui:Label text="Уровни" class="small-text bold" />
+                        <ui:ListView name="levelsList" class="list" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="split-col panel">
+                        <ui:Label text="Испытания" class="small-text bold" />
+                        <ui:ListView name="challengesList" class="list" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- FOOTER -->
+        <ui:VisualElement class="footer">
+            <ui:Button name="btnStart" text="Старт" class="btn footer-btn" />
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

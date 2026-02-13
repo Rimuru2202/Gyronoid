@@ -1,0 +1,56 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/Gironoid/_Project/UI/USS/GironoidTheme.uss?fileID=7433441132597879392&amp;guid=fc9f20816bcfe4b449526fac985697d0&amp;type=3#GironoidTheme" />
+    <ui:VisualElement name="root" class="app-root app-root--shop" style="background-image: url(&quot;project://database/Assets/Gironoid/_Project/Art/dark_space_background_1920x1080.png?fileID=2800000&amp;guid=aa9ad563fab07884aa6fca68cc597f4e&amp;type=3#dark_space_background_1920x1080&quot;); background-color: rgb(255, 255, 255); -unity-background-image-tint-color: rgb(255, 255, 255);">
+        <ui:VisualElement class="topbar panel topbar--decor" style="background-color: rgba(0, 0, 0, 0); border-left-color: rgba(255, 255, 255, 0); border-right-color: rgba(255, 255, 255, 0); border-top-color: rgba(255, 255, 255, 0); border-bottom-color: rgba(255, 255, 255, 0);">
+            <ui:VisualElement class="topbar-left">
+                <ui:Button name="btnBack" text="←" class="icon-btn" />
+            </ui:VisualElement>
+            <ui:VisualElement class="topbar-center">
+                <ui:VisualElement name="titlePlate" class="title-plate" style="-unity-text-align: middle-center; width: 360px; height: 70px; border-left-color: rgba(90, 200, 255, 0); border-right-color: rgba(90, 200, 255, 0); border-top-color: rgba(90, 200, 255, 0); border-bottom-color: rgba(90, 200, 255, 0); background-color: rgba(12, 16, 28, 0);">
+                    <ui:Label name="lblTitle" text="Магазин" class="brand" style="-unity-text-align: middle-center; font-size: 64px; -unity-text-outline-color: rgba(0, 0, 0, 0); -unity-background-image-tint-color: rgba(255, 255, 255, 0);" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="topbar-right">
+                <ui:VisualElement name="tokensPlate" class="title-plate title-plate--small" style="background-color: rgba(255, 255, 255, 0); -unity-background-image-tint-color: rgba(255, 255, 255, 0); border-left-color: rgba(90, 200, 255, 0); border-right-color: rgba(90, 200, 255, 0); border-top-color: rgba(90, 200, 255, 0); border-bottom-color: rgba(90, 200, 255, 0);">
+                    <ui:Label name="lblShopBalance" text="Жетоны: --" class="small-text" style="-unity-text-align: middle-center; -unity-text-outline-color: rgb(255, 255, 255); font-size: 34px;" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="topbar-decor-lines">
+                <ui:VisualElement class="topbar-line topbar-line--a" />
+                <ui:VisualElement class="topbar-line topbar-line--b" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="content content--stretch" style="background-color: rgb(0, 0, 0);">
+            <ui:VisualElement name="shopScreen" class="center-panel vstack center-panel--wide" style="background-color: rgba(0, 0, 0, 0); border-left-color: rgba(255, 255, 255, 0); border-right-color: rgba(255, 255, 255, 0); border-top-color: rgba(255, 255, 255, 0); border-bottom-color: rgba(255, 255, 255, 0);">
+                <ui:VisualElement class="split-row">
+                    <ui:VisualElement class="split-col panel" style="height: 760px; background-color: rgba(24, 28, 45, 0); border-left-color: rgba(255, 255, 255, 0); border-right-color: rgba(255, 255, 255, 0); border-top-color: rgba(255, 255, 255, 0); border-bottom-color: rgba(255, 255, 255, 0);">
+                        <ui:Label name="lblShopTitle" text="Магазин кораблей" class="h2like" style="-unity-text-outline-color: rgba(255, 255, 255, 0.94);" />
+                        <ui:VisualElement style="height: 8px;" />
+                        <ui:ListView name="shopShipsList" class="list" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="split-col panel" style="height: 760px; background-color: rgba(24, 28, 45, 0); border-left-color: rgba(255, 255, 255, 0); border-right-color: rgba(255, 255, 255, 0); border-top-color: rgba(255, 255, 255, 0); border-bottom-color: rgba(255, 255, 255, 0);">
+                        <ui:Label name="lblShopShipName" text="Выберите корабль" class="h2like" style="-unity-text-outline-color: rgba(255, 255, 255, 0.94);" />
+                        <ui:Label name="lblShopShipReq" class="small-text" style="-unity-text-outline-color: rgba(255, 255, 255, 0.94);" />
+                        <ui:VisualElement style="height: 8px;" />
+                        <ui:Label name="lblShopShipStats" class="small-text wrap" style="color: rgba(255, 255, 255, 0.96); -unity-text-outline-color: rgba(255, 255, 255, 0.94);" />
+                        <ui:VisualElement style="height: 8px;" />
+                        <ui:Label name="lblShopShipPrice" class="small-text bold" style="-unity-text-outline-color: rgba(255, 255, 255, 0.94);" />
+                        <ui:Label name="lblShopShipStatus" class="small-text wrap dim" style="-unity-text-outline-color: rgba(255, 255, 255, 0.94);" />
+                        <ui:VisualElement style="height: 12px;" />
+                        <ui:Button name="btnShopBuy" text="Купить" class="btn" style="height: 96px;" />
+                        <ui:VisualElement style="height: 18px;" />
+                        <ui:VisualElement name="adPanel" class="panel vstack" style="height: 260px; background-color: rgba(0, 0, 0, 0); border-left-color: rgba(255, 255, 255, 0); border-right-color: rgba(255, 255, 255, 0); border-top-color: rgba(255, 255, 255, 0); border-bottom-color: rgba(255, 255, 255, 0);">
+                            <ui:Label name="lblAdTitle" text="Реклама" class="small-text bold" style="-unity-text-outline-color: rgba(255, 255, 255, 0.94);" />
+                            <ui:Label name="lblAdStatus" text="Баннер: --" class="small-text wrap dim" style="-unity-text-outline-color: rgba(255, 255, 255, 0.94);" />
+                            <ui:VisualElement name="adBanner" class="panel" style="height: 120px; background-color: rgba(24, 28, 45, 0.25); border-left-color: rgba(255, 255, 255, 0); border-right-color: rgba(255, 255, 255, 0); border-top-color: rgba(255, 255, 255, 0); border-bottom-color: rgba(255, 255, 255, 0);" />
+                            <ui:VisualElement style="height: 10px;" />
+                            <ui:Button name="btnWatchAd" text="Смотреть рекламу (+жетоны)" class="btn btn--secondary" style="height: 84px;" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="footer" />
+        <ui:VisualElement name="tutorialLayer" class="tutorial-layer" />
+    </ui:VisualElement>
+</ui:UXML>
