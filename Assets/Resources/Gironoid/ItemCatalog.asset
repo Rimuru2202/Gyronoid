@@ -18,20 +18,20 @@ MonoBehaviour:
   - Id: WPN_START_PULSE
     Type: 1
     NameRu: "\u0411\u0430\u0437\u043E\u0432\u0430\u044F \u043F\u0443\u0448\u043A\u0430"
-    Icon: {fileID: 21300000, guid: ad28608eb10d30d45a28051f910f236c, type: 3}
+    Icon: {fileID: 3188867983059848843, guid: 654a937efd0efad4d923f5ac1ad93d12, type: 3}
     Damage: 25
-    FireRate: 0.2
+    FireRate: 1
     EnergyPerShot: 0
     ShieldMaxBonus: 0
     ShieldRegenBonus: 0
     MoveSpeedBonus: 0
     AccelerationBonus: 0
     DamageMultiplier: 0
-    FireRateMultiplier: 0
+    FireRateMultiplier: 5
   - Id: ENG_START_ION
     Type: 2
     NameRu: "\u0411\u0430\u0437\u043E\u0432\u044B\u0439 \u0434\u0432\u0438\u0433\u0430\u0442\u0435\u043B\u044C"
-    Icon: {fileID: 21300000, guid: fbc13c02d710f334ca9015c04dc95dd9, type: 3}
+    Icon: {fileID: 21300000, guid: a3dd641726935a548a4280f6a2c67d19, type: 3}
     Damage: 0
     FireRate: 0
     EnergyPerShot: 0

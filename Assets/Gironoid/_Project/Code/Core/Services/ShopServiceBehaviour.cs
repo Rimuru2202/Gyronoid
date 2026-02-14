@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Gironoid._Project.Code.Core;
 using Gironoid._Project.Code.Core.Config;
 using Gironoid._Project.Code.Core.Profile;
@@ -27,8 +28,10 @@ namespace Gironoid._Project.Code.Core.Services
         [SerializeField] private AdsServiceBehaviour _ads;
 
         [Header("Rewarded settings")]
-        [SerializeField] private int _rewardedTokensAmount = 120;
+        [SerializeField] private int _rewardedTokensAmount = 10;
         [SerializeField] private string _rewardedPlacement = "shop_reward_tokens";
+        [SerializeField, Range(60f, 1800f)] private float _rewardedCooldownSeconds = 300f;
+        [SerializeField] private bool _disableRewardedInGameplay = true;
 
         [Header("Interstitial settings")]
         [SerializeField] private bool _showInterstitialOnClose = true;
@@ -39,6 +42,8 @@ namespace Gironoid._Project.Code.Core.Services
 
         private readonly List<ShopProduct> _products = new List<ShopProduct>(32);
         private bool _builtFromConfig;
+        private long _lastRewardedGrantedUnixSeconds;
+        private const string RewardedCooldownPrefKey = "gyronoid_rewarded_last_unix";
 
         public event Action<PlayerProfile> OnProfileChanged;
 
@@ -54,6 +59,16 @@ namespace Gironoid._Project.Code.Core.Services
         {
             if (_ads == null)
                 _ads = FindObjectOfType<AdsServiceBehaviour>(true);
+
+            try
+            {
+                var s = PlayerPrefs.GetString(RewardedCooldownPrefKey, "0");
+                long.TryParse(s, out _lastRewardedGrantedUnixSeconds);
+            }
+            catch
+            {
+                _lastRewardedGrantedUnixSeconds = 0;
+            }
 
             // базовый список (минимум) — пока конфиг может быть ещё не готов
             BuildFallbackProducts();
@@ -201,12 +216,35 @@ namespace Gironoid._Project.Code.Core.Services
                 return;
             }
 
+            if (_disableRewardedInGameplay && IsGameplaySceneActive())
+            {
+                done?.Invoke(ShopPurchaseResult.Fail("rewarded_not_allowed_in_gameplay"));
+                return;
+            }
+
+            if (!IsRewardedCooldownReady())
+            {
+                done?.Invoke(ShopPurchaseResult.Fail("rewarded_cooldown"));
+                return;
+            }
+
             _ads.ShowRewarded(
                 _rewardedPlacement,
                 onRewarded: () =>
                 {
                     int add = Mathf.Max(0, _rewardedTokensAmount);
                     var flush = ShouldFlushToServer();
+
+                    _lastRewardedGrantedUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                    try
+                    {
+                        PlayerPrefs.SetString(RewardedCooldownPrefKey, _lastRewardedGrantedUnixSeconds.ToString());
+                        PlayerPrefs.Save();
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
 
                     GironoidApp.ProfileService.Apply(pr =>
                     {
@@ -247,6 +285,15 @@ namespace Gironoid._Project.Code.Core.Services
             // Rewarded — токены за просмотр рекламы
             _products.Add(ShopProduct.RewardedTokens("Токены за рекламу", "Посмотрите видео и получите токены.", 0));
 
+            // Fallback starter ship (на случай, если конфиг ещё не готов).
+            _products.Add(ShopProduct.Ship(
+                ShipIdToProductId("AEGIS"),
+                "Эгида",
+                "Треб. уровень: 1",
+                priceTokens: 50,
+                shipId: "AEGIS",
+                requiredPlayerLevel: 1));
+
             // fallback packs
             _products.Add(ShopProduct.Pack(ShopProductId.BuyIronPack, "Железо", "Набор железа для крафта и улучшений.", priceTokens: 35, addIron: 120, addCopper: 0, addSilver: 0));
             _products.Add(ShopProduct.Pack(ShopProductId.BuyCopperPack, "Медь", "Набор меди для крафта и улучшений.", priceTokens: 35, addIron: 0, addCopper: 120, addSilver: 0));
@@ -263,6 +310,7 @@ namespace Gironoid._Project.Code.Core.Services
 
             // 1) Ships
             var sc = cfg != null ? cfg.ShipCatalog : null;
+            bool hasAnyShipProduct = false;
             if (sc != null && sc.Ships != null)
             {
                 for (int i = 0; i < sc.Ships.Length; i++)
@@ -273,9 +321,9 @@ namespace Gironoid._Project.Code.Core.Services
 
                     var pid = ShipIdToProductId(def.Id);
                     if (pid == ShopProductId.None)
-                        continue;
+                        pid = DynamicShipProductId(def.Id, i);
 
-                    int price = Mathf.Max(0, def.PriceTokens);
+                    int price = ResolveShipPriceTokens(sc, def, i);
                     string title = string.IsNullOrWhiteSpace(def.NameRu) ? def.Id : def.NameRu;
 
                     // описание: требования + краткие статы Mk1 (если есть)
@@ -293,7 +341,37 @@ namespace Gironoid._Project.Code.Core.Services
                         shipId: def.Id,
                         requiredPlayerLevel: Mathf.Max(1, def.UnlockPlayerLevel)
                     ));
+
+                    hasAnyShipProduct = true;
                 }
+            }
+
+            if (!hasAnyShipProduct)
+            {
+                string starterId = (sc != null && !string.IsNullOrWhiteSpace(sc.StarterShipId))
+                    ? sc.StarterShipId.Trim()
+                    : "AEGIS";
+
+                int starterPrice = 50;
+                int starterReqLevel = 1;
+                string starterName = starterId;
+                string starterDesc = "Треб. уровень: 1";
+
+                if (sc != null && sc.TryGet(starterId, out var starterDef))
+                {
+                    starterPrice = ResolveShipPriceTokens(sc, starterDef, 0);
+                    starterReqLevel = Mathf.Max(1, starterDef.UnlockPlayerLevel);
+                    starterName = string.IsNullOrWhiteSpace(starterDef.NameRu) ? starterDef.Id : starterDef.NameRu;
+                    starterDesc = $"Треб. уровень: {starterReqLevel}";
+                }
+
+                _products.Add(ShopProduct.Ship(
+                    DynamicShipProductId(starterId, 0),
+                    starterName,
+                    starterDesc,
+                    priceTokens: starterPrice,
+                    shipId: starterId,
+                    requiredPlayerLevel: starterReqLevel));
             }
 
             // 2) Resource packs
@@ -307,7 +385,7 @@ namespace Gironoid._Project.Code.Core.Services
         {
             if (string.IsNullOrEmpty(shipId)) return ShopProductId.None;
 
-            switch (shipId)
+            switch (shipId.Trim().ToUpperInvariant())
             {
                 case "AEGIS": return ShopProductId.BuyShip_AEGIS;
                 case "ASTRA": return ShopProductId.BuyShip_ASTRA;
@@ -320,10 +398,76 @@ namespace Gironoid._Project.Code.Core.Services
             }
         }
 
+        private static ShopProductId DynamicShipProductId(string shipId, int index)
+        {
+            unchecked
+            {
+                int hash = 17;
+                string src = string.IsNullOrWhiteSpace(shipId) ? $"SHIP_{index}" : shipId.Trim().ToUpperInvariant();
+                for (int i = 0; i < src.Length; i++)
+                    hash = (hash * 31) + src[i];
+
+                hash ^= (index + 1) * 397;
+                int raw = 1000 + Mathf.Abs(hash % 1000000);
+                return (ShopProductId)raw;
+            }
+        }
+
         private static bool ShouldFlushToServer()
         {
             var y = GironoidApp.Yandex;
             return y != null && y.CanUseCloud;
+        }
+
+        private bool IsRewardedCooldownReady()
+        {
+            if (_rewardedCooldownSeconds <= 0f)
+                return true;
+
+            if (_lastRewardedGrantedUnixSeconds <= 0)
+                return true;
+
+            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var elapsed = now - _lastRewardedGrantedUnixSeconds;
+            return elapsed >= (long)Mathf.CeilToInt(_rewardedCooldownSeconds);
+        }
+
+        private static int ResolveShipPriceTokens(ShipCatalog catalog, ShipDefinition def, int index)
+        {
+            if (catalog != null &&
+                !string.IsNullOrEmpty(catalog.StarterShipId) &&
+                string.Equals(def.Id, catalog.StarterShipId, StringComparison.OrdinalIgnoreCase))
+            {
+                return 50;
+            }
+
+            if (def.PriceTokens > 0)
+                return def.PriceTokens;
+
+            // Safety fallback for old assets where PriceTokens wasn't serialized yet.
+            return Mathf.Max(100, 300 + Mathf.Max(0, index) * 250);
+        }
+
+        private static bool IsGameplaySceneActive()
+        {
+            var active = SceneManager.GetActiveScene().name ?? "";
+            if (active.Length == 0)
+                return false;
+
+            if (string.Equals(active, "50_Gameplay", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            try
+            {
+                if (string.Equals(active, GironoidScenes.Gameplay, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            catch
+            {
+                // ignore
+            }
+
+            return active.IndexOf("Gameplay", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void LogVerbose(string msg)

@@ -254,16 +254,36 @@ namespace Gironoid._Project.Code.Core.Services
 
                 if (likelyNew)
                 {
-                    p.Tokens += 750;
+                    p.Tokens += 50;
                     p.Iron += 50;
                 }
 
                 p.StarterResourcesGranted = true;
-                if (p.Version < 2) p.Version = 2;
+                if (p.Version < 3) p.Version = 3;
             }
             else
             {
-                if (p.Version < 2) p.Version = 2;
+                if (p.Version < 3) p.Version = 3;
+            }
+
+            // Миграция старых профилей: в раннем онбординге должно быть 50 токенов
+            // для покупки первого корабля, а не старые 750.
+            if (!p.FirstShipTutorialBudgetApplied)
+            {
+                bool noShips = p.OwnedShips == null || p.OwnedShips.Count == 0;
+                bool earlyTutorial = p.TutorialStep <= 1;
+                bool noMetaProgress =
+                    (p.CompletedLevelIds == null || p.CompletedLevelIds.Count == 0) &&
+                    (p.CompletedChallengeIds == null || p.CompletedChallengeIds.Count == 0);
+
+                if (noShips && earlyTutorial && noMetaProgress)
+                {
+                    p.Tokens = 50;
+                    if (p.Iron < 50) p.Iron = 50;
+                }
+
+                p.FirstShipTutorialBudgetApplied = true;
+                if (p.Version < 3) p.Version = 3;
             }
 
             if (_cfg != null && _cfg.StarMap != null && _cfg.StarMap.Planets != null && _cfg.StarMap.Planets.Length > 0)

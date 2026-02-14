@@ -47,22 +47,27 @@ namespace Gironoid._Project.Code.Core.Profile
         // Выдача стартового пакета должна происходить один раз (для новых профилей).
         public bool StarterResourcesGranted;
 
+        // Подготовка экономики первого шага обучения (первый корабль за 50 токенов).
+        // Нужен для мягкой миграции старых профилей, где стартовый баланс был 750.
+        public bool FirstShipTutorialBudgetApplied;
+
         // Онбординг/обучение в ангаре:
         // 0 = не начинали (в меню подсказка "Открой ангар")
-        // 1 = в ангаре → магазин
-        // 2 = купить корабль
-        // 3 = крафт оружия
-        // 4 = крафт двигателя
-        // 5 = установить двигатель
-        // 6 = установить оружие
-        // 7 = вылет
+        // 1 = открыть магазин и купить первый корабль
+        // 2 = корабль куплен, закрыть магазин
+        // 3 = подтверждение "Вот ваш первый корабль", переход к крафту
+        // 4 = создан стартовый двигатель
+        // 5 = создано стартовое орудие
+        // 6 = установлен двигатель
+        // 7 = установлено орудие, готовность к вылету
+        // 8 = ангар завершён
         public int TutorialStep;
 
         public static PlayerProfile CreateDefault()
         {
             return new PlayerProfile
             {
-                Version = 2,
+                Version = 3,
                 PlayerLevel = 1,
 
                 Energy = 0,
@@ -75,7 +80,7 @@ namespace Gironoid._Project.Code.Core.Profile
 
                 ActivitySelection = Gironoid._Project.Code.Core.Profile.ActivitySelection.None,
 
-                Tokens = 750,
+                Tokens = 50,
                 Iron = 50,
                 Copper = 0,
                 Silver = 0,
@@ -88,6 +93,7 @@ namespace Gironoid._Project.Code.Core.Profile
                 CompletedChallengeIds = new List<string>(64),
 
                 StarterResourcesGranted = true,
+                FirstShipTutorialBudgetApplied = true,
                 TutorialStep = 0,
             };
         }

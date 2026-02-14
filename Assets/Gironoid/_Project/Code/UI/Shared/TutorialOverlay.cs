@@ -24,9 +24,19 @@ namespace Gironoid._Project.Code.UI.Shared
         private VisualElement _tooltip;
         private VisualElement _tooltipBox;
         private Label _tooltipLabel;
+        private Label _arrow;
 
         private VisualElement _target;
         private float _padding;
+        private float _tooltipOffset;
+        private bool _blockInput = true;
+
+        private float _arrowBaseLeft;
+        private float _arrowBaseTop;
+        private bool _arrowPointsDown = true;
+
+        private IVisualElementScheduledItem _layoutTicker;
+        private IVisualElementScheduledItem _arrowTicker;
 
         private bool _shown;
 
@@ -58,12 +68,24 @@ namespace Gironoid._Project.Code.UI.Shared
         {
             _shown = false;
             _target = null;
+            _blockInput = true;
+
+            _layoutTicker?.Pause();
+            _arrowTicker?.Pause();
+
+            if (_arrow != null)
+                _arrow.style.display = DisplayStyle.None;
 
             if (_layer != null)
                 _layer.style.display = DisplayStyle.None;
         }
 
-        public void Show(VisualElement target, string text, float padding = 12f, float tooltipOffset = 12f)
+        public void Show(
+            VisualElement target,
+            string text,
+            float padding = 12f,
+            float tooltipOffset = 12f,
+            bool blockInput = true)
         {
             if (target == null)
             {
@@ -73,10 +95,20 @@ namespace Gironoid._Project.Code.UI.Shared
 
             _target = target;
             _padding = Mathf.Max(0f, padding);
+            _tooltipOffset = tooltipOffset;
+            _blockInput = blockInput;
             _shown = true;
 
             if (_tooltipLabel != null)
                 _tooltipLabel.text = text ?? "";
+
+            // Поднимаем overlay в верх дерева, чтобы он работал поверх любых модалок.
+            if (_layer.parent != null)
+            {
+                var parent = _layer.parent;
+                parent.Remove(_layer);
+                parent.Add(_layer);
+            }
 
             _layer.style.display = DisplayStyle.Flex;
 
@@ -84,8 +116,34 @@ namespace Gironoid._Project.Code.UI.Shared
             _root.schedule.Execute(() =>
             {
                 if (_shown)
-                    UpdateLayout(tooltipOffset);
+                    UpdateLayout(_tooltipOffset);
             }).ExecuteLater(0);
+
+            if (_layoutTicker == null)
+            {
+                _layoutTicker = _root.schedule.Execute(() =>
+                {
+                    if (_shown)
+                        UpdateLayout(_tooltipOffset);
+                }).Every(33);
+            }
+            else
+            {
+                _layoutTicker.Resume();
+            }
+
+            if (_arrowTicker == null)
+            {
+                _arrowTicker = _root.schedule.Execute(() =>
+                {
+                    if (_shown)
+                        AnimateArrow();
+                }).Every(16);
+            }
+            else
+            {
+                _arrowTicker.Resume();
+            }
         }
 
         private void BuildUi()
@@ -137,33 +195,48 @@ namespace Gironoid._Project.Code.UI.Shared
 
             _tooltipBox = new VisualElement { name = "tutorialTooltipBox" };
             _tooltipBox.style.flexDirection = FlexDirection.Column;
-            _tooltipBox.style.paddingLeft = 12;
-            _tooltipBox.style.paddingRight = 12;
-            _tooltipBox.style.paddingTop = 10;
-            _tooltipBox.style.paddingBottom = 10;
+            _tooltipBox.style.paddingLeft = 16;
+            _tooltipBox.style.paddingRight = 16;
+            _tooltipBox.style.paddingTop = 14;
+            _tooltipBox.style.paddingBottom = 14;
 
-            _tooltipBox.style.backgroundColor = new Color(0.06f, 0.08f, 0.12f, 0.95f);
-            _tooltipBox.style.borderTopWidth = 1;
-            _tooltipBox.style.borderRightWidth = 1;
-            _tooltipBox.style.borderBottomWidth = 1;
-            _tooltipBox.style.borderLeftWidth = 1;
-            _tooltipBox.style.borderTopColor = new Color(0.30f, 0.60f, 1f, 0.60f);
-            _tooltipBox.style.borderRightColor = new Color(0.30f, 0.60f, 1f, 0.60f);
-            _tooltipBox.style.borderBottomColor = new Color(0.30f, 0.60f, 1f, 0.60f);
-            _tooltipBox.style.borderLeftColor = new Color(0.30f, 0.60f, 1f, 0.60f);
+            _tooltipBox.style.backgroundColor = new Color(0.07f, 0.11f, 0.18f, 0.97f);
+            _tooltipBox.style.borderTopWidth = 2;
+            _tooltipBox.style.borderRightWidth = 2;
+            _tooltipBox.style.borderBottomWidth = 2;
+            _tooltipBox.style.borderLeftWidth = 2;
+            _tooltipBox.style.borderTopColor = new Color(0.62f, 0.85f, 1f, 0.92f);
+            _tooltipBox.style.borderRightColor = new Color(0.62f, 0.85f, 1f, 0.92f);
+            _tooltipBox.style.borderBottomColor = new Color(0.62f, 0.85f, 1f, 0.92f);
+            _tooltipBox.style.borderLeftColor = new Color(0.62f, 0.85f, 1f, 0.92f);
 
-            _tooltipBox.style.borderTopLeftRadius = 10;
-            _tooltipBox.style.borderTopRightRadius = 10;
-            _tooltipBox.style.borderBottomLeftRadius = 10;
-            _tooltipBox.style.borderBottomRightRadius = 10;
+            _tooltipBox.style.borderTopLeftRadius = 14;
+            _tooltipBox.style.borderTopRightRadius = 14;
+            _tooltipBox.style.borderBottomLeftRadius = 14;
+            _tooltipBox.style.borderBottomRightRadius = 14;
 
             _tooltipLabel = new Label { name = "tutorialTooltipLabel" };
             _tooltipLabel.style.whiteSpace = WhiteSpace.Normal;
+            _tooltipLabel.style.fontSize = 22;
+            _tooltipLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _tooltipLabel.style.color = new Color(0.96f, 0.99f, 1f, 1f);
+            _tooltipLabel.style.unityTextOutlineWidth = 2;
+            _tooltipLabel.style.unityTextOutlineColor = new Color(0f, 0f, 0f, 0.86f);
 
             _tooltipBox.Add(_tooltipLabel);
             _tooltip.Add(_tooltipBox);
 
             _layer.Add(_tooltip);
+
+            _arrow = new Label { name = "tutorialArrow", text = "▼" };
+            _arrow.style.position = Position.Absolute;
+            _arrow.style.fontSize = 56;
+            _arrow.style.color = new Color(0.85f, 0.97f, 1f, 1f);
+            _arrow.style.unityTextOutlineWidth = 2;
+            _arrow.style.unityTextOutlineColor = new Color(0f, 0f, 0f, 0.88f);
+            _arrow.style.display = DisplayStyle.None;
+            _arrow.pickingMode = PickingMode.Ignore;
+            _layer.Add(_arrow);
         }
 
         private VisualElement MakeDim(string name)
@@ -219,37 +292,47 @@ namespace Gironoid._Project.Code.UI.Shared
             _highlight.style.height = hlH;
             _highlight.style.display = DisplayStyle.Flex;
 
-            // 4 диммера вокруг выделения (оставляем "дырку" над кнопкой)
-            // TOP
-            _dimTop.style.left = 0;
-            _dimTop.style.top = 0;
-            _dimTop.style.right = 0;
-            _dimTop.style.height = hlTop;
-            _dimTop.style.display = (hlTop > 0.5f) ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_blockInput)
+            {
+                // 4 диммера вокруг выделения (оставляем "дырку" над кнопкой)
+                // TOP
+                _dimTop.style.left = 0;
+                _dimTop.style.top = 0;
+                _dimTop.style.right = 0;
+                _dimTop.style.height = hlTop;
+                _dimTop.style.display = (hlTop > 0.5f) ? DisplayStyle.Flex : DisplayStyle.None;
 
-            // BOTTOM
-            _dimBottom.style.left = 0;
-            _dimBottom.style.top = hlTop + hlH;
-            _dimBottom.style.right = 0;
-            _dimBottom.style.bottom = 0;
-            _dimBottom.style.display = (hlTop + hlH < rootH - 0.5f) ? DisplayStyle.Flex : DisplayStyle.None;
+                // BOTTOM
+                _dimBottom.style.left = 0;
+                _dimBottom.style.top = hlTop + hlH;
+                _dimBottom.style.right = 0;
+                _dimBottom.style.bottom = 0;
+                _dimBottom.style.display = (hlTop + hlH < rootH - 0.5f) ? DisplayStyle.Flex : DisplayStyle.None;
 
-            // LEFT
-            _dimLeft.style.left = 0;
-            _dimLeft.style.top = hlTop;
-            _dimLeft.style.width = hlLeft;
-            _dimLeft.style.height = hlH;
-            _dimLeft.style.display = (hlLeft > 0.5f && hlH > 0.5f) ? DisplayStyle.Flex : DisplayStyle.None;
+                // LEFT
+                _dimLeft.style.left = 0;
+                _dimLeft.style.top = hlTop;
+                _dimLeft.style.width = hlLeft;
+                _dimLeft.style.height = hlH;
+                _dimLeft.style.display = (hlLeft > 0.5f && hlH > 0.5f) ? DisplayStyle.Flex : DisplayStyle.None;
 
-            // RIGHT
-            _dimRight.style.left = hlLeft + hlW;
-            _dimRight.style.top = hlTop;
-            _dimRight.style.right = 0;
-            _dimRight.style.height = hlH;
-            _dimRight.style.display = (hlLeft + hlW < rootW - 0.5f && hlH > 0.5f) ? DisplayStyle.Flex : DisplayStyle.None;
+                // RIGHT
+                _dimRight.style.left = hlLeft + hlW;
+                _dimRight.style.top = hlTop;
+                _dimRight.style.right = 0;
+                _dimRight.style.height = hlH;
+                _dimRight.style.display = (hlLeft + hlW < rootW - 0.5f && hlH > 0.5f) ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+            else
+            {
+                _dimTop.style.display = DisplayStyle.None;
+                _dimBottom.style.display = DisplayStyle.None;
+                _dimLeft.style.display = DisplayStyle.None;
+                _dimRight.style.display = DisplayStyle.None;
+            }
 
             // Tooltip: стараемся ставить слева от цели (как у вас на скрине), иначе справа
-            float maxTipW = Mathf.Clamp(360f, 220f, rootW - 24f);
+            float maxTipW = Mathf.Clamp(520f, 260f, rootW - 24f);
             _tooltipBox.style.maxWidth = maxTipW;
 
             // Примерная высота, чтобы не улетать за экран (точная может быть 0 до layout, это ок)
@@ -265,6 +348,33 @@ namespace Gironoid._Project.Code.UI.Shared
             _tooltip.style.left = tipX;
             _tooltip.style.top = tipY;
             _tooltip.style.display = DisplayStyle.Flex;
+
+            if (_arrow != null)
+            {
+                float centerX = hlLeft + (hlW * 0.5f);
+                _arrowPointsDown = hlTop > 84f;
+                _arrow.text = _arrowPointsDown ? "▼" : "▲";
+
+                _arrowBaseLeft = Mathf.Clamp(centerX - 18f, 8f, rootW - 48f);
+                _arrowBaseTop = _arrowPointsDown
+                    ? Mathf.Clamp(hlTop - 54f, 6f, rootH - 60f)
+                    : Mathf.Clamp(hlTop + hlH + 6f, 6f, rootH - 60f);
+
+                _arrow.style.left = _arrowBaseLeft;
+                _arrow.style.top = _arrowBaseTop;
+                _arrow.style.display = DisplayStyle.Flex;
+            }
+        }
+
+        private void AnimateArrow()
+        {
+            if (_arrow == null || !_shown || _arrow.style.display == DisplayStyle.None)
+                return;
+
+            float wave = Mathf.Sin(Time.unscaledTime * 6f) * 6f;
+            float y = _arrowPointsDown ? _arrowBaseTop + wave : _arrowBaseTop - wave;
+            _arrow.style.left = _arrowBaseLeft;
+            _arrow.style.top = y;
         }
     }
 }

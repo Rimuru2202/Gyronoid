@@ -15,6 +15,7 @@ MonoBehaviour:
   Energy: {fileID: 11400000, guid: c346fb3734f81344f904d6ab96402e15, type: 2}
   StarMap: {fileID: 11400000, guid: 91b5564f786ba5f4096ef0c4a01d9c03, type: 2}
   SystemContent: {fileID: 11400000, guid: 6a80846a7cdff0a438565dc1aaed24df, type: 2}
+  PlayerWeapon: {fileID: 11400000, guid: d4e65063eab54f85a3f39634d69aa096, type: 2}
   ShipCatalog: {fileID: 11400000, guid: cf59086964b1cf942841c6a3ecba9793, type: 2}
   ItemCatalog: {fileID: 11400000, guid: bc123379a4537844b9ad27c751e2cda5, type: 2}
   ResourcesPath: Gironoid/GameConfig

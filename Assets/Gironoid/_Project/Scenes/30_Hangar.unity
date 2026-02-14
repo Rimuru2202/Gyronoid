@@ -466,7 +466,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _profileService: {fileID: 1730661214}
   _ads: {fileID: 1730661210}
-  _rewardedTokensAmount: 120
+  _rewardedTokensAmount: 10
   _rewardedPlacement: shop_reward_tokens
   _showInterstitialOnClose: 1
   _interstitialPlacement: shop_close

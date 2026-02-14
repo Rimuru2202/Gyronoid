@@ -173,12 +173,12 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: bbb23a67436429c4492f77fef34c2bac, type: 3}
+  m_Sprite: {fileID: -8209584369952210793, guid: d351c345d1699f54dbf6c40f0414a1b5, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 0.37, y: 0.25}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -236,6 +236,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _projectilePrefab: {fileID: 8224425384571102832, guid: 56949cbca11abc34d9a618e943d79736, type: 3}
+  _weaponConfig: {fileID: 11400000, guid: d4e65063eab54f85a3f39634d69aa096, type: 2}
   _fallbackDamage: 1
   _fallbackFireRate: 0.2
   _projectileSpeed: 12
@@ -306,8 +307,8 @@ PolygonCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 2.1433334, y: 1.6066667}
-    newSize: {x: 1, y: 1}
+    oldSize: {x: 0.24, y: 0.45}
+    newSize: {x: 0.37, y: 0.25}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0

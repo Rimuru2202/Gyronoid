@@ -9,6 +9,7 @@ namespace Gironoid._Project.Code.Core.Config
         public EnergyConfig Energy;
         public StarMapConfig StarMap;
         public SystemContentConfig SystemContent;
+        public PlayerWeaponConfig PlayerWeapon;
 
         [Header("Meta Catalogs")]
         public ShipCatalog ShipCatalog;
