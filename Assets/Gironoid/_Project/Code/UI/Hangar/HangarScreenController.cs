@@ -18,6 +18,17 @@ namespace Gironoid._Project.Code.UI.Hangar
     public sealed class HangarScreenController : MonoBehaviour
     {
         private const float UiTickInterval = 0.25f;
+        private const int TutorialStepBuyFirstShip = 1;
+        private const int TutorialStepShipPurchased = 2;
+        private const int TutorialStepFirstShipConfirmed = 3;
+        private const int TutorialStepStarterEngineCrafted = 4;
+        private const int TutorialStepStarterWeaponCrafted = 5;
+        private const int TutorialStepStarterEngineEquipped = 6;
+        private const int TutorialStepStarterWeaponEquipped = 7;
+        private const int TutorialStepHangarCompleted = 8;
+
+        private const int StarterCraftIronCost = 25;
+        private const int DefaultCraftIronCost = 35;
 
         [SerializeField] private UIDocument _ui;
 
@@ -112,6 +123,36 @@ namespace Gironoid._Project.Code.UI.Hangar
 
         // NEW: если GironoidApp еще не готов - мягкая отложенная инициализация
         private bool _deferredInitDone;
+        private bool _shopWasOpenLastTick;
+
+        // Popup после первой покупки корабля: "Вот ваш первый корабль".
+        private VisualElement _firstShipPopupLayer;
+        private VisualElement _firstShipPopupCard;
+        private Label _firstShipPopupTitle;
+        private Label _firstShipPopupText;
+        private Button _firstShipPopupOk;
+
+        // Popup крафта в ангаре (первичный onboarding-флоу).
+        private VisualElement _craftModalLayer;
+        private VisualElement _craftModalCard;
+        private Label _craftModalTitle;
+        private Label _craftModalText;
+        private Label _craftModalBlueprintName;
+        private Label _craftModalChance;
+        private Label _craftModalStats;
+        private ListView _craftBlueprintsList;
+        private Button _craftTabWeapons;
+        private Button _craftTabShields;
+        private Button _craftTabEngines;
+        private Button _craftTabModifiers;
+        private Button _craftModalAction;
+        private Button _craftModalClose;
+        private bool _craftModalBusy;
+        private bool _craftListSetupDone;
+        private bool _suppressCraftSelectionChanged;
+        private ItemType _craftSelectedType = ItemType.Engine;
+        private readonly List<CraftBlueprintVm> _craftBlueprints = new List<CraftBlueprintVm>(32);
+        private CraftBlueprintVm _craftSelectedBlueprint;
 
         private void Awake()
         {
@@ -130,6 +171,8 @@ namespace Gironoid._Project.Code.UI.Hangar
             BindSlotButtons(_root);
 
             CreateTutorialOverlay(_root);
+            BuildFirstShipPopup(_root);
+            BuildCraftModal(_root);
             CreateShopModalOrExternal(_root);
 
             WireUi();
@@ -147,6 +190,7 @@ namespace Gironoid._Project.Code.UI.Hangar
             _nextUiTick = 0f;
             _deferredInitDone = false;
             _externalShopOpen = false;
+            _shopWasOpenLastTick = false;
 
             InvalidateCaches();
 
@@ -169,10 +213,31 @@ namespace Gironoid._Project.Code.UI.Hangar
             if (GironoidApp.IsReady && GironoidApp.Hangar != null)
                 GironoidApp.Hangar.EnsureStarterKit();
 
-            // Вход в ангар = начинаем онбординг
-            SetTutorialStepAtLeast(1);
+            var p = GironoidApp.Profile;
+            if (p != null)
+            {
+                bool hasShip = p.OwnedShips != null && p.OwnedShips.Count > 0;
+
+                if (hasShip)
+                {
+                    if (p.TutorialStep < TutorialStepShipPurchased)
+                        SetTutorialStepAtLeast(TutorialStepShipPurchased);
+                }
+                else
+                {
+                    if (p.TutorialStep != TutorialStepBuyFirstShip)
+                        SetTutorialStepExact(TutorialStepBuyFirstShip);
+
+                    HideFirstShipPopup();
+                    HideCraftModal();
+                }
+            }
 
             RefreshAll(force: true);
+
+            bool hasAnyShip = p != null && p.OwnedShips != null && p.OwnedShips.Count > 0;
+            if (hasAnyShip && p != null && p.TutorialStep == TutorialStepShipPurchased && !IsShopOpen())
+                ShowFirstShipPopup();
 
             ShowOnboardingHint();
             UpdateTutorialOverlay();
@@ -204,6 +269,8 @@ namespace Gironoid._Project.Code.UI.Hangar
 
             if (_btnShopExternalBack != null)
                 _btnShopExternalBack.clicked -= CloseExternalShop;
+            if (_btnShopClose != null)
+                _btnShopClose.clicked -= OnShopCloseClickedFallback;
 
             _shopService = null;
             _shopModalRoot = null;
@@ -212,6 +279,50 @@ namespace Gironoid._Project.Code.UI.Hangar
             _shopExternalRoot = null;
             _btnShopExternalBack = null;
             _externalShopOpen = false;
+
+            if (_firstShipPopupOk != null)
+                _firstShipPopupOk.clicked -= OnFirstShipPopupOk;
+
+            _firstShipPopupLayer = null;
+            _firstShipPopupCard = null;
+            _firstShipPopupTitle = null;
+            _firstShipPopupText = null;
+            _firstShipPopupOk = null;
+
+            if (_craftModalAction != null)
+                _craftModalAction.clicked -= OnCraftModalAction;
+            if (_craftModalClose != null)
+                _craftModalClose.clicked -= OnCraftModalClose;
+            if (_craftTabWeapons != null)
+                _craftTabWeapons.clicked -= OnCraftTabWeaponsClicked;
+            if (_craftTabShields != null)
+                _craftTabShields.clicked -= OnCraftTabShieldsClicked;
+            if (_craftTabEngines != null)
+                _craftTabEngines.clicked -= OnCraftTabEnginesClicked;
+            if (_craftTabModifiers != null)
+                _craftTabModifiers.clicked -= OnCraftTabModifiersClicked;
+            if (_craftBlueprintsList != null)
+                _craftBlueprintsList.selectionChanged -= OnCraftBlueprintSelectionChanged;
+
+            _craftModalLayer = null;
+            _craftModalCard = null;
+            _craftModalTitle = null;
+            _craftModalText = null;
+            _craftModalBlueprintName = null;
+            _craftModalChance = null;
+            _craftModalStats = null;
+            _craftBlueprintsList = null;
+            _craftTabWeapons = null;
+            _craftTabShields = null;
+            _craftTabEngines = null;
+            _craftTabModifiers = null;
+            _craftModalAction = null;
+            _craftModalClose = null;
+            _craftModalBusy = false;
+            _craftListSetupDone = false;
+            _suppressCraftSelectionChanged = false;
+            _craftBlueprints.Clear();
+            _craftSelectedBlueprint = null;
         }
 
         private void Update()
@@ -232,8 +343,57 @@ namespace Gironoid._Project.Code.UI.Hangar
             {
                 _nextUiTick = UiTickInterval;
                 RefreshAll(force: false);
+                HandleEarlyOnboardingTransitions();
                 UpdateTutorialOverlay();
             }
+        }
+
+        private void HandleEarlyOnboardingTransitions()
+        {
+            if (!GironoidApp.IsReady)
+                return;
+
+            var p = GironoidApp.Profile;
+            if (p == null)
+                return;
+
+            bool shopOpen = IsShopOpen();
+            bool hasShip = p.OwnedShips != null && p.OwnedShips.Count > 0;
+
+            if (!hasShip)
+            {
+                if (p.TutorialStep != TutorialStepBuyFirstShip)
+                    SetTutorialStepExact(TutorialStepBuyFirstShip);
+
+                HideFirstShipPopup();
+                HideCraftModal();
+                _shopWasOpenLastTick = shopOpen;
+                return;
+            }
+
+            if (p.TutorialStep < TutorialStepShipPurchased)
+                SetTutorialStepAtLeast(TutorialStepShipPurchased);
+
+            if (_shopWasOpenLastTick && !shopOpen && p.TutorialStep == TutorialStepShipPurchased)
+                ShowFirstShipPopup();
+
+            if (HasStarterEngineCrafted(p) && p.TutorialStep < TutorialStepStarterEngineCrafted)
+                SetTutorialStepAtLeast(TutorialStepStarterEngineCrafted);
+
+            if (HasStarterWeaponCrafted(p) && p.TutorialStep < TutorialStepStarterWeaponCrafted)
+                SetTutorialStepAtLeast(TutorialStepStarterWeaponCrafted);
+
+            var shipId = ResolveSelectedShipId(p, GironoidApp.Config);
+            if (!string.IsNullOrEmpty(shipId))
+            {
+                if (HasAnyEquipped(p, shipId, ItemType.Engine) && p.TutorialStep < TutorialStepStarterEngineEquipped)
+                    SetTutorialStepAtLeast(TutorialStepStarterEngineEquipped);
+
+                if (HasAnyEquipped(p, shipId, ItemType.Weapon) && p.TutorialStep < TutorialStepStarterWeaponEquipped)
+                    SetTutorialStepAtLeast(TutorialStepStarterWeaponEquipped);
+            }
+
+            _shopWasOpenLastTick = shopOpen;
         }
 
         private void BindUi(VisualElement root)
@@ -261,12 +421,980 @@ namespace Gironoid._Project.Code.UI.Hangar
             _lblItemDetails = root.Q<Label>("lblItemDetails");
 
             _inventoryList = root.Q<ListView>("inventoryList");
+
+            if (_lblShipAction != null)
+            {
+                _lblShipAction.style.fontSize = 30;
+                _lblShipAction.style.unityFontStyleAndWeight = FontStyle.Bold;
+                _lblShipAction.style.color = new Color(0.93f, 0.98f, 1f, 1f);
+                _lblShipAction.style.unityTextOutlineWidth = 2;
+                _lblShipAction.style.unityTextOutlineColor = new Color(0f, 0f, 0f, 0.82f);
+                _lblShipAction.style.whiteSpace = WhiteSpace.Normal;
+            }
         }
 
         private void CreateTutorialOverlay(VisualElement root)
         {
             var layer = root.Q<VisualElement>("tutorialLayer");
             _tutorial = new TutorialOverlay(root, layer);
+        }
+
+        private void BuildFirstShipPopup(VisualElement root)
+        {
+            if (root == null)
+                return;
+
+            _firstShipPopupLayer = root.Q<VisualElement>("firstShipPopupLayer");
+            if (_firstShipPopupLayer == null)
+            {
+                _firstShipPopupLayer = new VisualElement { name = "firstShipPopupLayer" };
+                _firstShipPopupLayer.style.position = Position.Absolute;
+                _firstShipPopupLayer.style.left = 0;
+                _firstShipPopupLayer.style.top = 0;
+                _firstShipPopupLayer.style.right = 0;
+                _firstShipPopupLayer.style.bottom = 0;
+                _firstShipPopupLayer.style.justifyContent = Justify.Center;
+                _firstShipPopupLayer.style.alignItems = Align.Center;
+                _firstShipPopupLayer.style.backgroundColor = new Color(0f, 0f, 0f, 0.72f);
+                _firstShipPopupLayer.pickingMode = PickingMode.Position;
+                _firstShipPopupLayer.style.display = DisplayStyle.None;
+
+                _firstShipPopupCard = new VisualElement { name = "firstShipPopupCard" };
+                _firstShipPopupCard.style.width = 520;
+                _firstShipPopupCard.style.maxWidth = new Length(90, LengthUnit.Percent);
+                _firstShipPopupCard.style.paddingLeft = 18;
+                _firstShipPopupCard.style.paddingRight = 18;
+                _firstShipPopupCard.style.paddingTop = 16;
+                _firstShipPopupCard.style.paddingBottom = 16;
+                _firstShipPopupCard.style.backgroundColor = new Color(0.06f, 0.10f, 0.18f, 0.96f);
+                _firstShipPopupCard.style.borderTopLeftRadius = 12;
+                _firstShipPopupCard.style.borderTopRightRadius = 12;
+                _firstShipPopupCard.style.borderBottomLeftRadius = 12;
+                _firstShipPopupCard.style.borderBottomRightRadius = 12;
+                _firstShipPopupCard.style.borderTopWidth = 1;
+                _firstShipPopupCard.style.borderRightWidth = 1;
+                _firstShipPopupCard.style.borderBottomWidth = 1;
+                _firstShipPopupCard.style.borderLeftWidth = 1;
+
+                var borderColor = new Color(0.45f, 0.75f, 1f, 0.65f);
+                _firstShipPopupCard.style.borderTopColor = borderColor;
+                _firstShipPopupCard.style.borderRightColor = borderColor;
+                _firstShipPopupCard.style.borderBottomColor = borderColor;
+                _firstShipPopupCard.style.borderLeftColor = borderColor;
+
+                _firstShipPopupTitle = new Label { name = "firstShipPopupTitle", text = "Вот ваш первый корабль" };
+                _firstShipPopupTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+                _firstShipPopupTitle.style.fontSize = 28;
+                _firstShipPopupTitle.style.marginBottom = 10;
+                _firstShipPopupTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+
+                _firstShipPopupText = new Label
+                {
+                    name = "firstShipPopupText",
+                    text = "Отлично. Теперь нужно подготовить корабль к вылету."
+                };
+                _firstShipPopupText.style.whiteSpace = WhiteSpace.Normal;
+                _firstShipPopupText.style.unityTextAlign = TextAnchor.MiddleCenter;
+                _firstShipPopupText.style.marginBottom = 14;
+
+                _firstShipPopupOk = new Button { name = "btnFirstShipPopupOk", text = "Понятно" };
+                _firstShipPopupOk.style.height = 56;
+                _firstShipPopupOk.style.alignSelf = Align.Center;
+                _firstShipPopupOk.style.minWidth = 220;
+                _firstShipPopupOk.clicked += OnFirstShipPopupOk;
+
+                _firstShipPopupCard.Add(_firstShipPopupTitle);
+                _firstShipPopupCard.Add(_firstShipPopupText);
+                _firstShipPopupCard.Add(_firstShipPopupOk);
+                _firstShipPopupLayer.Add(_firstShipPopupCard);
+                root.Add(_firstShipPopupLayer);
+            }
+            else
+            {
+                _firstShipPopupCard = _firstShipPopupLayer.Q<VisualElement>("firstShipPopupCard");
+                _firstShipPopupTitle = _firstShipPopupLayer.Q<Label>("firstShipPopupTitle");
+                _firstShipPopupText = _firstShipPopupLayer.Q<Label>("firstShipPopupText");
+                _firstShipPopupOk = _firstShipPopupLayer.Q<Button>("btnFirstShipPopupOk");
+
+                if (_firstShipPopupOk != null)
+                {
+                    _firstShipPopupOk.clicked -= OnFirstShipPopupOk;
+                    _firstShipPopupOk.clicked += OnFirstShipPopupOk;
+                }
+            }
+
+            HideFirstShipPopup();
+        }
+
+        private bool IsFirstShipPopupVisible()
+        {
+            return _firstShipPopupLayer != null &&
+                   _firstShipPopupLayer.style.display == DisplayStyle.Flex;
+        }
+
+        private void ShowFirstShipPopup()
+        {
+            if (_firstShipPopupLayer == null)
+                return;
+
+            _firstShipPopupLayer.style.display = DisplayStyle.Flex;
+            _tutorial?.Hide();
+            ShowAction("Вот ваш первый корабль. Нажмите «Понятно».");
+        }
+
+        private void HideFirstShipPopup()
+        {
+            if (_firstShipPopupLayer != null)
+                _firstShipPopupLayer.style.display = DisplayStyle.None;
+        }
+
+        private void OnFirstShipPopupOk()
+        {
+            HideFirstShipPopup();
+            SetTutorialStepAtLeast(TutorialStepFirstShipConfirmed);
+            ShowOnboardingHint();
+            UpdateTutorialOverlay();
+        }
+
+        private void BuildCraftModal(VisualElement root)
+        {
+            if (root == null)
+                return;
+
+            _craftModalLayer = root.Q<VisualElement>("craftModalLayer");
+            if (_craftModalLayer == null)
+            {
+                _craftModalLayer = new VisualElement { name = "craftModalLayer" };
+                _craftModalLayer.style.position = Position.Absolute;
+                _craftModalLayer.style.left = 0;
+                _craftModalLayer.style.top = 0;
+                _craftModalLayer.style.right = 0;
+                _craftModalLayer.style.bottom = 0;
+                _craftModalLayer.style.justifyContent = Justify.Center;
+                _craftModalLayer.style.alignItems = Align.Center;
+                _craftModalLayer.style.backgroundColor = new Color(0f, 0f, 0f, 0.80f);
+                _craftModalLayer.pickingMode = PickingMode.Position;
+                _craftModalLayer.style.display = DisplayStyle.None;
+
+                _craftModalCard = new VisualElement { name = "craftModalCard" };
+                _craftModalCard.style.width = 1080;
+                _craftModalCard.style.maxWidth = new Length(96, LengthUnit.Percent);
+                _craftModalCard.style.maxHeight = new Length(92, LengthUnit.Percent);
+                _craftModalCard.style.paddingLeft = 18;
+                _craftModalCard.style.paddingRight = 18;
+                _craftModalCard.style.paddingTop = 16;
+                _craftModalCard.style.paddingBottom = 16;
+                _craftModalCard.style.backgroundColor = new Color(0.06f, 0.10f, 0.18f, 0.96f);
+                _craftModalCard.style.borderTopLeftRadius = 12;
+                _craftModalCard.style.borderTopRightRadius = 12;
+                _craftModalCard.style.borderBottomLeftRadius = 12;
+                _craftModalCard.style.borderBottomRightRadius = 12;
+                _craftModalCard.style.borderTopWidth = 1;
+                _craftModalCard.style.borderRightWidth = 1;
+                _craftModalCard.style.borderBottomWidth = 1;
+                _craftModalCard.style.borderLeftWidth = 1;
+
+                var borderColor = new Color(0.45f, 0.75f, 1f, 0.65f);
+                _craftModalCard.style.borderTopColor = borderColor;
+                _craftModalCard.style.borderRightColor = borderColor;
+                _craftModalCard.style.borderBottomColor = borderColor;
+                _craftModalCard.style.borderLeftColor = borderColor;
+                _craftModalCard.style.flexDirection = FlexDirection.Column;
+
+                _craftModalTitle = new Label { name = "craftModalTitle", text = "Крафт" };
+                _craftModalTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+                _craftModalTitle.style.fontSize = 28;
+                _craftModalTitle.style.marginBottom = 8;
+                _craftModalTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+
+                _craftModalText = new Label
+                {
+                    name = "craftModalText",
+                    text = "Выберите вкладку и чертёж, затем нажмите «Крафт»."
+                };
+                _craftModalText.style.whiteSpace = WhiteSpace.Normal;
+                _craftModalText.style.unityTextAlign = TextAnchor.MiddleCenter;
+                _craftModalText.style.marginBottom = 12;
+
+                var tabsRow = new VisualElement { name = "craftTabsRow" };
+                tabsRow.style.flexDirection = FlexDirection.Row;
+                tabsRow.style.justifyContent = Justify.Center;
+                tabsRow.style.alignItems = Align.Center;
+                tabsRow.style.marginBottom = 10;
+
+                _craftTabWeapons = new Button { name = "btnCraftTabWeapons", text = "Орудия" };
+                _craftTabShields = new Button { name = "btnCraftTabShields", text = "Щиты" };
+                _craftTabEngines = new Button { name = "btnCraftTabEngines", text = "Двигатели" };
+                _craftTabModifiers = new Button { name = "btnCraftTabModifiers", text = "Модификаторы" };
+
+                ConfigureCraftTabButton(_craftTabWeapons);
+                ConfigureCraftTabButton(_craftTabShields);
+                ConfigureCraftTabButton(_craftTabEngines);
+                ConfigureCraftTabButton(_craftTabModifiers);
+
+                tabsRow.Add(_craftTabWeapons);
+                tabsRow.Add(_craftTabShields);
+                tabsRow.Add(_craftTabEngines);
+                tabsRow.Add(_craftTabModifiers);
+
+                var bodyRow = new VisualElement { name = "craftBodyRow" };
+                bodyRow.style.flexDirection = FlexDirection.Row;
+                bodyRow.style.flexGrow = 1;
+                bodyRow.style.minHeight = 420;
+
+                var leftCol = new VisualElement { name = "craftBlueprintsCol" };
+                leftCol.style.width = 360;
+                leftCol.style.maxWidth = new Length(42, LengthUnit.Percent);
+                leftCol.style.marginRight = 12;
+                leftCol.style.paddingLeft = 10;
+                leftCol.style.paddingRight = 10;
+                leftCol.style.paddingTop = 10;
+                leftCol.style.paddingBottom = 10;
+                leftCol.style.backgroundColor = new Color(0.09f, 0.13f, 0.22f, 0.65f);
+                leftCol.style.borderTopLeftRadius = 10;
+                leftCol.style.borderTopRightRadius = 10;
+                leftCol.style.borderBottomLeftRadius = 10;
+                leftCol.style.borderBottomRightRadius = 10;
+
+                var blueprintsTitle = new Label { name = "lblCraftBlueprintsTitle", text = "Чертежи" };
+                blueprintsTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+                blueprintsTitle.style.marginBottom = 6;
+
+                _craftBlueprintsList = new ListView { name = "craftBlueprintsList" };
+                _craftBlueprintsList.style.flexGrow = 1;
+                _craftBlueprintsList.style.minHeight = 320;
+
+                leftCol.Add(blueprintsTitle);
+                leftCol.Add(_craftBlueprintsList);
+
+                var rightCol = new VisualElement { name = "craftDetailsCol" };
+                rightCol.style.flexGrow = 1;
+                rightCol.style.paddingLeft = 10;
+                rightCol.style.paddingRight = 10;
+                rightCol.style.paddingTop = 10;
+                rightCol.style.paddingBottom = 10;
+                rightCol.style.backgroundColor = new Color(0.09f, 0.13f, 0.22f, 0.65f);
+                rightCol.style.borderTopLeftRadius = 10;
+                rightCol.style.borderTopRightRadius = 10;
+                rightCol.style.borderBottomLeftRadius = 10;
+                rightCol.style.borderBottomRightRadius = 10;
+
+                _craftModalBlueprintName = new Label { name = "craftModalBlueprintName", text = "Чертёж: —" };
+                _craftModalBlueprintName.style.unityFontStyleAndWeight = FontStyle.Bold;
+                _craftModalBlueprintName.style.fontSize = 23;
+                _craftModalBlueprintName.style.marginBottom = 8;
+
+                _craftModalChance = new Label { name = "craftModalChance", text = "Шанс: —" };
+                _craftModalChance.style.whiteSpace = WhiteSpace.Normal;
+                _craftModalChance.style.marginBottom = 8;
+
+                _craftModalStats = new Label
+                {
+                    name = "craftModalStats",
+                    text = "При крафте предмет получает случайные уровень, качество и характеристики."
+                };
+                _craftModalStats.style.whiteSpace = WhiteSpace.Normal;
+                _craftModalStats.style.flexGrow = 1;
+
+                rightCol.Add(_craftModalBlueprintName);
+                rightCol.Add(_craftModalChance);
+                rightCol.Add(_craftModalStats);
+
+                bodyRow.Add(leftCol);
+                bodyRow.Add(rightCol);
+
+                var actionsRow = new VisualElement { name = "craftModalActionsRow" };
+                actionsRow.style.flexDirection = FlexDirection.Row;
+                actionsRow.style.justifyContent = Justify.Center;
+                actionsRow.style.alignItems = Align.Center;
+                actionsRow.style.marginTop = 12;
+
+                _craftModalAction = new Button { name = "btnCraftModalAction", text = "Крафт" };
+                _craftModalAction.style.height = 56;
+                _craftModalAction.style.minWidth = 250;
+                _craftModalAction.style.marginRight = 6;
+
+                _craftModalClose = new Button { name = "btnCraftModalClose", text = "Закрыть" };
+                _craftModalClose.style.height = 56;
+                _craftModalClose.style.minWidth = 170;
+                _craftModalClose.style.marginLeft = 6;
+
+                actionsRow.Add(_craftModalAction);
+                actionsRow.Add(_craftModalClose);
+
+                _craftModalCard.Add(_craftModalTitle);
+                _craftModalCard.Add(_craftModalText);
+                _craftModalCard.Add(tabsRow);
+                _craftModalCard.Add(bodyRow);
+                _craftModalCard.Add(actionsRow);
+                _craftModalLayer.Add(_craftModalCard);
+                root.Add(_craftModalLayer);
+            }
+            else
+            {
+                _craftModalCard = _craftModalLayer.Q<VisualElement>("craftModalCard");
+                _craftModalTitle = _craftModalLayer.Q<Label>("craftModalTitle");
+                _craftModalText = _craftModalLayer.Q<Label>("craftModalText");
+                _craftModalBlueprintName = _craftModalLayer.Q<Label>("craftModalBlueprintName");
+                _craftModalChance = _craftModalLayer.Q<Label>("craftModalChance");
+                _craftModalStats = _craftModalLayer.Q<Label>("craftModalStats");
+                _craftBlueprintsList = _craftModalLayer.Q<ListView>("craftBlueprintsList");
+                _craftTabWeapons = _craftModalLayer.Q<Button>("btnCraftTabWeapons");
+                _craftTabShields = _craftModalLayer.Q<Button>("btnCraftTabShields");
+                _craftTabEngines = _craftModalLayer.Q<Button>("btnCraftTabEngines");
+                _craftTabModifiers = _craftModalLayer.Q<Button>("btnCraftTabModifiers");
+                _craftModalAction = _craftModalLayer.Q<Button>("btnCraftModalAction");
+                _craftModalClose = _craftModalLayer.Q<Button>("btnCraftModalClose");
+            }
+
+            if (_craftModalAction != null)
+            {
+                _craftModalAction.clicked -= OnCraftModalAction;
+                _craftModalAction.clicked += OnCraftModalAction;
+            }
+
+            if (_craftModalClose != null)
+            {
+                _craftModalClose.clicked -= OnCraftModalClose;
+                _craftModalClose.clicked += OnCraftModalClose;
+            }
+
+            if (_craftTabWeapons != null)
+            {
+                _craftTabWeapons.clicked -= OnCraftTabWeaponsClicked;
+                _craftTabWeapons.clicked += OnCraftTabWeaponsClicked;
+            }
+
+            if (_craftTabShields != null)
+            {
+                _craftTabShields.clicked -= OnCraftTabShieldsClicked;
+                _craftTabShields.clicked += OnCraftTabShieldsClicked;
+            }
+
+            if (_craftTabEngines != null)
+            {
+                _craftTabEngines.clicked -= OnCraftTabEnginesClicked;
+                _craftTabEngines.clicked += OnCraftTabEnginesClicked;
+            }
+
+            if (_craftTabModifiers != null)
+            {
+                _craftTabModifiers.clicked -= OnCraftTabModifiersClicked;
+                _craftTabModifiers.clicked += OnCraftTabModifiersClicked;
+            }
+
+            SetupCraftBlueprintListOnce();
+            HideCraftModal();
+        }
+
+        private static void ConfigureCraftTabButton(Button btn)
+        {
+            if (btn == null)
+                return;
+
+            btn.style.height = 56;
+            btn.style.minWidth = 220;
+            btn.style.marginLeft = 4;
+            btn.style.marginRight = 4;
+            btn.style.marginBottom = 2;
+            btn.style.paddingLeft = 10;
+            btn.style.paddingRight = 10;
+            btn.style.whiteSpace = WhiteSpace.Normal;
+            btn.style.unityTextAlign = TextAnchor.MiddleCenter;
+        }
+
+        private void SetupCraftBlueprintListOnce()
+        {
+            if (_craftBlueprintsList == null || _craftListSetupDone)
+                return;
+
+            _craftListSetupDone = true;
+            _craftBlueprintsList.itemsSource = _craftBlueprints;
+            _craftBlueprintsList.selectionType = SelectionType.Single;
+            _craftBlueprintsList.fixedItemHeight = 68;
+
+            _craftBlueprintsList.makeItem = () =>
+            {
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Column;
+                row.style.paddingLeft = 10;
+                row.style.paddingRight = 10;
+                row.style.paddingTop = 8;
+                row.style.paddingBottom = 8;
+
+                var title = new Label { name = "title" };
+                title.style.unityFontStyleAndWeight = FontStyle.Bold;
+
+                var subtitle = new Label { name = "subtitle" };
+                subtitle.style.opacity = 0.9f;
+
+                row.Add(title);
+                row.Add(subtitle);
+                return row;
+            };
+
+            _craftBlueprintsList.bindItem = (ve, index) =>
+            {
+                if ((uint)index >= (uint)_craftBlueprints.Count)
+                    return;
+
+                var vm = _craftBlueprints[index];
+                var title = ve.Q<Label>("title");
+                var subtitle = ve.Q<Label>("subtitle");
+
+                if (title != null) title.text = vm.Title;
+                if (subtitle != null) subtitle.text = vm.Subtitle;
+            };
+
+            _craftBlueprintsList.selectionChanged -= OnCraftBlueprintSelectionChanged;
+            _craftBlueprintsList.selectionChanged += OnCraftBlueprintSelectionChanged;
+        }
+
+        private void RebuildCraftBlueprints(bool keepCurrentSelection)
+        {
+            string keepId = keepCurrentSelection && _craftSelectedBlueprint != null
+                ? _craftSelectedBlueprint.DefinitionId
+                : null;
+
+            _craftBlueprints.Clear();
+
+            var cfg = GironoidApp.Config;
+            var cat = cfg != null ? cfg.ItemCatalog : null;
+            if (cat != null && cat.Items != null)
+            {
+                for (int i = 0; i < cat.Items.Length; i++)
+                {
+                    var def = cat.Items[i];
+                    if (string.IsNullOrEmpty(def.Id))
+                        continue;
+
+                    if (def.Type != _craftSelectedType)
+                        continue;
+
+                    int ironCost = ResolveCraftIronCost(def.Id, def.Type);
+                    float avgChance = HangarLogic.GetCraftAverageSuccessChance();
+                    string displayName = string.IsNullOrWhiteSpace(def.NameRu) ? def.Id : def.NameRu;
+
+                    _craftBlueprints.Add(new CraftBlueprintVm
+                    {
+                        DefinitionId = def.Id,
+                        Type = def.Type,
+                        NameRu = displayName,
+                        IronCost = ironCost,
+                        TokenCost = 0,
+                        AverageChance = avgChance,
+                        Title = displayName,
+                        Subtitle = $"Железо: {ironCost} • Ср. шанс: {Mathf.RoundToInt(avgChance * 100f)}%"
+                    });
+                }
+            }
+
+            _craftBlueprints.Sort((a, b) => string.Compare(a.Title, b.Title, StringComparison.Ordinal));
+
+            if (_craftBlueprintsList != null)
+            {
+                try { _craftBlueprintsList.Rebuild(); }
+                catch { try { _craftBlueprintsList.RefreshItems(); } catch { } }
+            }
+
+            CraftBlueprintVm selected = null;
+            if (!string.IsNullOrEmpty(keepId))
+            {
+                for (int i = 0; i < _craftBlueprints.Count; i++)
+                {
+                    if (_craftBlueprints[i].DefinitionId == keepId)
+                    {
+                        selected = _craftBlueprints[i];
+                        break;
+                    }
+                }
+            }
+
+            if (selected == null && _craftBlueprints.Count > 0)
+                selected = _craftBlueprints[0];
+
+            _craftSelectedBlueprint = selected;
+
+            if (_craftBlueprintsList != null)
+            {
+                _suppressCraftSelectionChanged = true;
+                try
+                {
+                    if (selected == null)
+                    {
+                        _craftBlueprintsList.ClearSelection();
+                        _craftBlueprintsList.SetSelectionWithoutNotify(new int[0]);
+                    }
+                    else
+                    {
+                        int idx = FindCraftBlueprintIndexByDefinitionId(selected.DefinitionId);
+                        if (idx >= 0)
+                            _craftBlueprintsList.SetSelectionWithoutNotify(new[] { idx });
+                        else
+                            _craftBlueprintsList.ClearSelection();
+                    }
+                }
+                catch { }
+                finally
+                {
+                    _suppressCraftSelectionChanged = false;
+                }
+            }
+        }
+
+        private int FindCraftBlueprintIndexByDefinitionId(string definitionId)
+        {
+            if (string.IsNullOrEmpty(definitionId))
+                return -1;
+
+            for (int i = 0; i < _craftBlueprints.Count; i++)
+            {
+                if (_craftBlueprints[i].DefinitionId == definitionId)
+                    return i;
+            }
+            return -1;
+        }
+
+        private void OnCraftBlueprintSelectionChanged(IEnumerable<object> selected)
+        {
+            if (_suppressCraftSelectionChanged)
+                return;
+
+            CraftBlueprintVm vm = null;
+            if (selected != null)
+            {
+                foreach (var o in selected)
+                {
+                    vm = o as CraftBlueprintVm;
+                    if (vm != null)
+                        break;
+                }
+            }
+
+            _craftSelectedBlueprint = vm;
+            RefreshCraftModalState();
+            UpdateTutorialOverlay();
+        }
+
+        private void OnCraftTabWeaponsClicked()
+        {
+            if (_craftModalBusy)
+                return;
+
+            _craftSelectedType = ItemType.Weapon;
+            RebuildCraftBlueprints(keepCurrentSelection: false);
+            RefreshCraftModalState();
+            UpdateTutorialOverlay();
+        }
+
+        private void OnCraftTabShieldsClicked()
+        {
+            if (_craftModalBusy)
+                return;
+
+            _craftSelectedType = ItemType.Shield;
+            RebuildCraftBlueprints(keepCurrentSelection: false);
+            RefreshCraftModalState();
+            UpdateTutorialOverlay();
+        }
+
+        private void OnCraftTabEnginesClicked()
+        {
+            if (_craftModalBusy)
+                return;
+
+            _craftSelectedType = ItemType.Engine;
+            RebuildCraftBlueprints(keepCurrentSelection: false);
+            RefreshCraftModalState();
+            UpdateTutorialOverlay();
+        }
+
+        private void OnCraftTabModifiersClicked()
+        {
+            if (_craftModalBusy)
+                return;
+
+            _craftSelectedType = ItemType.Modifier;
+            RebuildCraftBlueprints(keepCurrentSelection: false);
+            RefreshCraftModalState();
+            UpdateTutorialOverlay();
+        }
+
+        private bool IsCraftModalVisible()
+        {
+            return _craftModalLayer != null &&
+                   _craftModalLayer.style.display == DisplayStyle.Flex;
+        }
+
+        private void OpenCraftModal()
+        {
+            if (_craftModalLayer == null)
+                return;
+
+            _craftModalBusy = false;
+            _craftSelectedType = ItemType.Engine;
+            RebuildCraftBlueprints(keepCurrentSelection: false);
+            RefreshCraftModalState();
+            _craftModalLayer.style.display = DisplayStyle.Flex;
+            _tutorial?.Hide();
+        }
+
+        private void HideCraftModal()
+        {
+            _craftModalBusy = false;
+            if (_craftModalLayer != null)
+                _craftModalLayer.style.display = DisplayStyle.None;
+        }
+
+        private void RefreshCraftModalState()
+        {
+            if (_craftModalTitle != null)
+                _craftModalTitle.text = "Крафт";
+
+            var p = GironoidApp.Profile;
+            var cfg = GironoidApp.Config;
+            bool canCraft = p != null && cfg != null && cfg.ItemCatalog != null && GironoidApp.Hangar != null;
+
+            string requiredDefId = GetRequiredTutorialCraftDefinitionId(p, cfg);
+            ItemType requiredType = GetRequiredCraftTypeByDefinition(requiredDefId, cfg);
+            bool tutorialCraftActive = !string.IsNullOrEmpty(requiredDefId);
+
+            if (tutorialCraftActive && requiredType != ItemType.None)
+            {
+                if (_craftTabWeapons != null) _craftTabWeapons.SetEnabled(requiredType == ItemType.Weapon && !_craftModalBusy);
+                if (_craftTabShields != null) _craftTabShields.SetEnabled(false);
+                if (_craftTabEngines != null) _craftTabEngines.SetEnabled(requiredType == ItemType.Engine && !_craftModalBusy);
+                if (_craftTabModifiers != null) _craftTabModifiers.SetEnabled(false);
+            }
+            else
+            {
+                if (_craftTabWeapons != null) _craftTabWeapons.SetEnabled(!_craftModalBusy);
+                if (_craftTabShields != null) _craftTabShields.SetEnabled(!_craftModalBusy);
+                if (_craftTabEngines != null) _craftTabEngines.SetEnabled(!_craftModalBusy);
+                if (_craftTabModifiers != null) _craftTabModifiers.SetEnabled(!_craftModalBusy);
+            }
+
+            RefreshCraftTabSelectionVisuals();
+
+            bool hasSelected = _craftSelectedBlueprint != null;
+            bool selectedIsRequired = hasSelected && (!tutorialCraftActive || _craftSelectedBlueprint.DefinitionId == requiredDefId);
+            bool hasResources = canCraft && hasSelected && HasCraftResources(p, _craftSelectedBlueprint);
+
+            if (_craftModalText != null)
+            {
+                if (!canCraft)
+                {
+                    _craftModalText.text = "Крафт временно недоступен.";
+                }
+                else if (tutorialCraftActive)
+                {
+                    string requiredName = GetCraftDefinitionDisplayName(cfg, requiredDefId);
+                    if (_craftSelectedType != requiredType)
+                    {
+                        _craftModalText.text = $"Шаг обучения: откройте вкладку «{ItemTypeToRu(requiredType)}».";
+                    }
+                    else if (!selectedIsRequired)
+                    {
+                        _craftModalText.text = $"Шаг обучения: выберите чертёж «{requiredName}».";
+                    }
+                    else
+                    {
+                        _craftModalText.text =
+                            "Нажмите «Крафт». В обычном режиме шанс зависит от качества предмета: выше качество, ниже шанс.";
+                    }
+                }
+                else
+                {
+                    _craftModalText.text = "Выберите чертёж и нажмите «Крафт».";
+                }
+            }
+
+            if (_craftModalBlueprintName != null)
+            {
+                _craftModalBlueprintName.text = hasSelected
+                    ? $"Чертёж: {_craftSelectedBlueprint.NameRu}"
+                    : "Чертёж: —";
+            }
+
+            if (_craftModalChance != null)
+            {
+                if (!hasSelected)
+                    _craftModalChance.text = "Шанс создания: —";
+                else if (tutorialCraftActive && selectedIsRequired)
+                    _craftModalChance.text = "Шанс создания: 100% (обучение).";
+                else
+                    _craftModalChance.text =
+                        $"Шанс: Common 92%, Uncommon 78%, Rare 56%, Epic 34%, Legendary 18% (средний ~{Mathf.RoundToInt(_craftSelectedBlueprint.AverageChance * 100f)}%).";
+            }
+
+            if (_craftModalStats != null)
+                _craftModalStats.text = BuildCraftStatsText(cfg, _craftSelectedBlueprint);
+
+            if (_craftModalAction != null)
+            {
+                _craftModalAction.text = tutorialCraftActive ? "Крафт (обучение)" : "Крафт";
+                bool actionable = !_craftModalBusy && canCraft && hasSelected && selectedIsRequired && hasResources;
+                _craftModalAction.SetEnabled(actionable);
+            }
+
+            if (_craftModalClose != null)
+                _craftModalClose.SetEnabled(!_craftModalBusy && !tutorialCraftActive);
+        }
+
+        private void OnCraftModalAction()
+        {
+            if (_craftModalBusy)
+                return;
+
+            _craftModalBusy = true;
+            RefreshCraftModalState();
+
+            try
+            {
+                if (TryCraftSelectedBlueprint(out var msg))
+                    ShowAction(msg);
+                else
+                    ShowAction(string.IsNullOrEmpty(msg) ? "Ошибка крафта." : msg);
+            }
+            finally
+            {
+                _craftModalBusy = false;
+                RefreshCraftModalState();
+                InvalidateInventoryAndEquippedCaches();
+                RefreshAll(force: true);
+                ShowOnboardingHint();
+                UpdateTutorialOverlay();
+            }
+        }
+
+        private void OnCraftModalClose()
+        {
+            var p = GironoidApp.Profile;
+            var cfg = GironoidApp.Config;
+            if (p != null && cfg != null)
+            {
+                if (!string.IsNullOrEmpty(GetRequiredTutorialCraftDefinitionId(p, cfg)))
+                {
+                    ShowAction("Сначала создайте базовый двигатель и базовое орудие.");
+                    RefreshCraftModalState();
+                    UpdateTutorialOverlay();
+                    return;
+                }
+            }
+
+            HideCraftModal();
+            ShowOnboardingHint();
+            UpdateTutorialOverlay();
+        }
+
+        private bool TryCraftSelectedBlueprint(out string message)
+        {
+            message = "";
+
+            if (!GironoidApp.IsReady || GironoidApp.Hangar == null)
+            {
+                message = "Крафт недоступен.";
+                return false;
+            }
+
+            var p = GironoidApp.Profile;
+            var cfg = GironoidApp.Config;
+            if (p == null || cfg == null || cfg.ItemCatalog == null)
+            {
+                message = "ItemCatalog не задан — крафт недоступен.";
+                return false;
+            }
+
+            if (_craftSelectedBlueprint == null)
+            {
+                message = "Сначала выберите чертёж.";
+                return false;
+            }
+
+            var defId = _craftSelectedBlueprint.DefinitionId;
+            string requiredDefId = GetRequiredTutorialCraftDefinitionId(p, cfg);
+            bool tutorialCraftActive = !string.IsNullOrEmpty(requiredDefId);
+
+            if (tutorialCraftActive && !string.Equals(defId, requiredDefId, StringComparison.Ordinal))
+            {
+                message = $"По обучению сейчас нужно создать: {GetCraftDefinitionDisplayName(cfg, requiredDefId)}.";
+                return false;
+            }
+
+            int ironCost = ResolveCraftIronCost(defId, _craftSelectedBlueprint.Type);
+            int tokenCost = 0;
+            if (p.Iron < ironCost)
+            {
+                message = "Недостаточно железа для крафта.";
+                return false;
+            }
+
+            HangarLogic.Result res;
+            ItemInstance crafted;
+            if (tutorialCraftActive)
+            {
+                res = GironoidApp.Hangar.CraftItemWithChanceOverride(
+                    defId,
+                    ironCost,
+                    tokenCost,
+                    successChanceOverride: 1f,
+                    out crafted,
+                    flushToServer: ShouldFlushToServer());
+            }
+            else
+            {
+                res = GironoidApp.Hangar.CraftItem(
+                    defId,
+                    ironCost,
+                    tokenCost,
+                    out crafted,
+                    flushToServer: ShouldFlushToServer());
+            }
+
+            if (!res.Ok)
+            {
+                message = string.IsNullOrEmpty(res.Error) ? "Ошибка крафта." : res.Error;
+                return false;
+            }
+
+            if (crafted == null)
+            {
+                message = "Крафт не завершён.";
+                return false;
+            }
+
+            if (string.Equals(crafted.DefinitionId, cfg.ItemCatalog.StarterEngineDefinitionId, StringComparison.Ordinal))
+                SetTutorialStepAtLeast(TutorialStepStarterEngineCrafted);
+
+            if (string.Equals(crafted.DefinitionId, cfg.ItemCatalog.StarterWeaponDefinitionId, StringComparison.Ordinal))
+                SetTutorialStepAtLeast(TutorialStepStarterWeaponCrafted);
+
+            RebuildCraftBlueprints(keepCurrentSelection: true);
+            RefreshCraftModalState();
+
+            message = $"Создано: {crafted.DefinitionId} • Lv{crafted.Level} • {crafted.Quality}";
+            return true;
+        }
+
+        private void RefreshCraftTabSelectionVisuals()
+        {
+            SetCraftTabSelected(_craftTabWeapons, _craftSelectedType == ItemType.Weapon);
+            SetCraftTabSelected(_craftTabShields, _craftSelectedType == ItemType.Shield);
+            SetCraftTabSelected(_craftTabEngines, _craftSelectedType == ItemType.Engine);
+            SetCraftTabSelected(_craftTabModifiers, _craftSelectedType == ItemType.Modifier);
+        }
+
+        private static void SetCraftTabSelected(Button btn, bool selected)
+        {
+            if (btn == null)
+                return;
+
+            btn.EnableInClassList("btn--selected", selected);
+        }
+
+        private static bool HasCraftResources(PlayerProfile p, CraftBlueprintVm vm)
+        {
+            if (p == null || vm == null)
+                return false;
+
+            return p.Iron >= vm.IronCost && p.Tokens >= vm.TokenCost;
+        }
+
+        private static string BuildCraftStatsText(GameConfig cfg, CraftBlueprintVm vm)
+        {
+            if (cfg == null || cfg.ItemCatalog == null || vm == null)
+                return "Выберите чертёж. На выходе предмет получает случайные уровень, качество и характеристики.";
+
+            if (!cfg.ItemCatalog.TryGet(vm.DefinitionId, out var def))
+                return "Описание чертежа недоступно.";
+
+            var sb = new StringBuilder(320);
+            sb.Append("Тип: ").Append(ItemTypeToRu(def.Type)).Append('\n');
+            sb.Append("Стоимость: ").Append(vm.IronCost).Append(" железа").Append('\n');
+            sb.Append("Результат: случайные уровень, качество и статы.").Append('\n');
+
+            if (def.Type == ItemType.Engine)
+            {
+                sb.Append("Скорость +").Append(def.MoveSpeedBonus.ToString("0.##")).Append('\n');
+                sb.Append("Ускорение +").Append(def.AccelerationBonus.ToString("0.##"));
+            }
+            else if (def.Type == ItemType.Weapon)
+            {
+                sb.Append("Урон ").Append(def.Damage.ToString("0.##")).Append('\n');
+                sb.Append("Скорострельность ").Append(def.FireRate.ToString("0.###"));
+            }
+            else if (def.Type == ItemType.Shield)
+            {
+                sb.Append("Щит +").Append(def.ShieldMaxBonus.ToString("0.##")).Append('\n');
+                sb.Append("Реген +").Append(def.ShieldRegenBonus.ToString("0.##"));
+            }
+            else if (def.Type == ItemType.Modifier)
+            {
+                sb.Append("Множитель урона x").Append(def.DamageMultiplier.ToString("0.##")).Append('\n');
+                sb.Append("Множитель скорострельности x").Append(def.FireRateMultiplier.ToString("0.##"));
+            }
+
+            return sb.ToString();
+        }
+
+        private int ResolveCraftIronCost(string definitionId, ItemType type)
+        {
+            var cfg = GironoidApp.Config;
+            var cat = cfg != null ? cfg.ItemCatalog : null;
+            if (cat != null)
+            {
+                if (!string.IsNullOrEmpty(cat.StarterEngineDefinitionId) &&
+                    string.Equals(definitionId, cat.StarterEngineDefinitionId, StringComparison.Ordinal))
+                    return StarterCraftIronCost;
+
+                if (!string.IsNullOrEmpty(cat.StarterWeaponDefinitionId) &&
+                    string.Equals(definitionId, cat.StarterWeaponDefinitionId, StringComparison.Ordinal))
+                    return StarterCraftIronCost;
+            }
+
+            switch (type)
+            {
+                case ItemType.Shield: return DefaultCraftIronCost + 5;
+                case ItemType.Modifier: return DefaultCraftIronCost + 10;
+                case ItemType.Weapon:
+                case ItemType.Engine:
+                default:
+                    return DefaultCraftIronCost;
+            }
+        }
+
+        private static string GetCraftDefinitionDisplayName(GameConfig cfg, string definitionId)
+        {
+            if (cfg != null && cfg.ItemCatalog != null && !string.IsNullOrEmpty(definitionId))
+            {
+                if (cfg.ItemCatalog.TryGet(definitionId, out var def) && !string.IsNullOrWhiteSpace(def.NameRu))
+                    return def.NameRu;
+            }
+
+            return string.IsNullOrEmpty(definitionId) ? "—" : definitionId;
+        }
+
+        private static ItemType GetRequiredCraftTypeByDefinition(string definitionId, GameConfig cfg)
+        {
+            if (cfg == null || cfg.ItemCatalog == null || string.IsNullOrEmpty(definitionId))
+                return ItemType.None;
+
+            if (cfg.ItemCatalog.TryGet(definitionId, out var def))
+                return def.Type;
+
+            return ItemType.None;
+        }
+
+        private static string ItemTypeToRu(ItemType type)
+        {
+            switch (type)
+            {
+                case ItemType.Weapon: return "Орудия";
+                case ItemType.Shield: return "Щиты";
+                case ItemType.Engine: return "Двигатели";
+                case ItemType.Modifier: return "Модификаторы";
+                default: return "Предметы";
+            }
         }
 
         private void CreateShopModalOrExternal(VisualElement root)
@@ -280,7 +1408,14 @@ namespace Gironoid._Project.Code.UI.Hangar
 
             _shopModalRoot = root.Q<VisualElement>("shopModal");
             if (_shopModalRoot != null)
+            {
                 _btnShopClose = _shopModalRoot.Q<Button>("btnShopClose");
+                if (_btnShopClose != null)
+                {
+                    _btnShopClose.clicked -= OnShopCloseClickedFallback;
+                    _btnShopClose.clicked += OnShopCloseClickedFallback;
+                }
+            }
 
             if (_shopService != null)
                 _shopService.OnProfileChanged += OnShopProfileChanged;
@@ -293,23 +1428,40 @@ namespace Gironoid._Project.Code.UI.Hangar
 
             if (_shopUi != null)
             {
-                // Подготовим ссылки на "назад/закрыть" в экране магазина.
-                _shopExternalRoot = _shopUi.rootVisualElement;
-
-                // Пытаемся найти кнопку выхода с наиболее вероятными именами.
-                _btnShopExternalBack =
-                    _shopExternalRoot?.Q<Button>("btnBack")
-                    ?? _shopExternalRoot?.Q<Button>("btnClose")
-                    ?? _shopExternalRoot?.Q<Button>("btnShopClose");
-
-                if (_btnShopExternalBack != null)
-                    _btnShopExternalBack.clicked += CloseExternalShop;
+                EnsureExternalShopBackBinding();
 
                 // По умолчанию держим внешний магазин выключенным, если он есть в сцене.
                 // (Если вам нужно иначе — просто снимите SetActive в инспекторе/коде.)
                 if (_shopUi.gameObject.activeSelf)
                     _shopUi.gameObject.SetActive(false);
             }
+        }
+
+        private void EnsureExternalShopBackBinding()
+        {
+            if (_shopUi == null)
+                return;
+
+            var root = _shopUi.rootVisualElement;
+            if (root == null)
+                return;
+
+            _shopExternalRoot = root;
+
+            var back =
+                root.Q<Button>("btnBack")
+                ?? root.Q<Button>("btnClose")
+                ?? root.Q<Button>("btnShopClose");
+
+            if (back == null)
+                return;
+
+            if (!ReferenceEquals(_btnShopExternalBack, back) && _btnShopExternalBack != null)
+                _btnShopExternalBack.clicked -= CloseExternalShop;
+
+            _btnShopExternalBack = back;
+            _btnShopExternalBack.clicked -= CloseExternalShop;
+            _btnShopExternalBack.clicked += CloseExternalShop;
         }
 
         private UIDocument TryFindExternalShopDocument()
@@ -341,6 +1493,19 @@ namespace Gironoid._Project.Code.UI.Hangar
 
         private void OnShopProfileChanged(PlayerProfile p)
         {
+            if (p != null)
+            {
+                bool hasShip = p.OwnedShips != null && p.OwnedShips.Count > 0;
+                if (hasShip)
+                {
+                    if (p.TutorialStep < TutorialStepShipPurchased)
+                        SetTutorialStepAtLeast(TutorialStepShipPurchased);
+
+                    if (IsShopOpen())
+                        SetShopCloseAllowed(true);
+                }
+            }
+
             // Магазин мог изменить жетоны/ресурсы — обновляем UI и туториал.
             InvalidateCaches();
             RefreshAll(force: true);
@@ -980,6 +2145,16 @@ namespace Gironoid._Project.Code.UI.Hangar
                 return;
             }
 
+            var requiredType = GetRequiredTutorialEquipType(profile, shipId);
+            if (requiredType != ItemType.None && _selectedItem.Type != requiredType)
+            {
+                ShowAction(requiredType == ItemType.Engine
+                    ? "Сначала установите двигатель."
+                    : "Сначала установите оружие.");
+                UpdateTutorialOverlay();
+                return;
+            }
+
             var flush = ShouldFlushToServer();
 
             var res = GironoidApp.Hangar.Equip(
@@ -1009,8 +2184,16 @@ namespace Gironoid._Project.Code.UI.Hangar
 
         private void AdvanceTutorialByEquip(ItemType type)
         {
-            if (type == ItemType.Engine) SetTutorialStepAtLeast(6);
-            if (type == ItemType.Weapon) SetTutorialStepAtLeast(7);
+            if (type == ItemType.Engine)
+                SetTutorialStepAtLeast(TutorialStepStarterEngineEquipped);
+
+            if (type == ItemType.Weapon)
+            {
+                var p = GironoidApp.Profile;
+                var shipId = ResolveSelectedShipId(p, GironoidApp.Config);
+                if (HasAnyEquipped(p, shipId, ItemType.Engine))
+                    SetTutorialStepAtLeast(TutorialStepStarterWeaponEquipped);
+            }
         }
 
         private void OnDismantle()
@@ -1143,7 +2326,7 @@ namespace Gironoid._Project.Code.UI.Hangar
             if (string.IsNullOrEmpty(shipId))
             {
                 ShowAction("Нельзя продолжить без корабля. Сначала купите корабль в магазине.");
-                SetTutorialStepAtLeast(1);
+                SetTutorialStepExact(TutorialStepBuyFirstShip);
                 UpdateTutorialOverlay();
                 return;
             }
@@ -1155,7 +2338,7 @@ namespace Gironoid._Project.Code.UI.Hangar
                 return;
             }
 
-            SetTutorialStepAtLeast(8);
+            SetTutorialStepAtLeast(TutorialStepHangarCompleted);
             StartCoroutine(FinishFlowToStarMap());
         }
 
@@ -1243,18 +2426,16 @@ namespace Gironoid._Project.Code.UI.Hangar
             if (!GironoidApp.IsReady)
                 return;
 
-            SetTutorialStepAtLeast(1);
+            SetTutorialStepAtLeast(TutorialStepBuyFirstShip);
 
             // 1) Если модальный магазин корректно привязан — используем его.
             if (_shopModal != null && _shopModal.IsBound)
             {
                 _shopModal.Open();
+                _shopWasOpenLastTick = true;
 
-                var p = GironoidApp.Profile;
-                bool hasShip = p != null && p.OwnedShips != null && p.OwnedShips.Count > 0;
-
-                // Во время обучения (когда нет корабля) — не даём закрыть модалку.
-                SetShopCloseAllowed(hasShip);
+                // Кнопка возврата из магазина должна всегда оставаться рабочей.
+                SetShopCloseAllowed(true);
 
                 UpdateTutorialOverlay();
                 return;
@@ -1279,6 +2460,7 @@ namespace Gironoid._Project.Code.UI.Hangar
         private void OpenExternalShop()
         {
             _externalShopOpen = true;
+            _shopWasOpenLastTick = true;
 
             // Скрываем ангарный UI, чтобы не было кликов “сквозь” магазин.
             if (_root != null)
@@ -1288,19 +2470,48 @@ namespace Gironoid._Project.Code.UI.Hangar
             _tutorial?.Hide();
 
             _shopUi.gameObject.SetActive(true);
+            EnsureExternalShopBackBinding();
+            if (_root != null)
+                _root.schedule.Execute(EnsureExternalShopBackBinding).ExecuteLater(0);
 
             ShowAction("Открыт магазин (отдельный экран).");
+        }
+
+        private void OnShopCloseClickedFallback()
+        {
+            // Защита: если встроенная привязка ShopModalController по какой-то причине потерялась,
+            // закрываем модалку отсюда.
+            if (_shopModal != null && _shopModal.IsBound && _shopModal.IsOpen)
+                _shopModal.Close();
+
+            var p = GironoidApp.Profile;
+            bool hasShip = p != null && p.OwnedShips != null && p.OwnedShips.Count > 0;
+            if (hasShip && p != null && p.TutorialStep == TutorialStepShipPurchased && !IsFirstShipPopupVisible())
+                ShowFirstShipPopup();
+
+            RefreshAll(force: true);
+            ShowOnboardingHint();
+            UpdateTutorialOverlay();
         }
 
         private void CloseExternalShop()
         {
             _externalShopOpen = false;
+            _shopWasOpenLastTick = false;
 
             if (_shopUi != null)
                 _shopUi.gameObject.SetActive(false);
 
             if (_root != null)
                 _root.style.display = DisplayStyle.Flex;
+
+            if (GironoidApp.IsReady && GironoidApp.Profile != null &&
+                GironoidApp.Profile.TutorialStep == TutorialStepShipPurchased &&
+                GironoidApp.Profile.OwnedShips != null &&
+                GironoidApp.Profile.OwnedShips.Count > 0)
+            {
+                ShowFirstShipPopup();
+            }
 
             RefreshAll(force: true);
             ShowOnboardingHint();
@@ -1311,6 +2522,9 @@ namespace Gironoid._Project.Code.UI.Hangar
         {
             if (_btnShopClose != null)
                 _btnShopClose.SetEnabled(allowed);
+
+            if (_btnShopExternalBack != null)
+                _btnShopExternalBack.SetEnabled(allowed);
         }
 
         private bool IsShopOpen()
@@ -1323,6 +2537,40 @@ namespace Gironoid._Project.Code.UI.Hangar
             return _externalShopOpen;
         }
 
+        private bool TryGetShopCloseTarget(out VisualElement target)
+        {
+            target = null;
+
+            if (_externalShopOpen)
+            {
+                if (_btnShopExternalBack != null)
+                {
+                    target = _btnShopExternalBack;
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (_btnShopClose != null)
+            {
+                target = _btnShopClose;
+                return true;
+            }
+
+            if (_shopModalRoot != null)
+            {
+                var fallback = _shopModalRoot.Q<Button>("btnBack");
+                if (fallback != null)
+                {
+                    target = fallback;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private bool TryGetShopPrimaryActionTarget(out VisualElement target)
         {
             target = null;
@@ -1330,7 +2578,15 @@ namespace Gironoid._Project.Code.UI.Hangar
             if (_shopModalRoot == null)
                 return false;
 
-            // 1) Пытаемся найти первую кнопку покупки в списке
+            // 1) Advanced-shop: кнопка "Купить" справа.
+            var buy = _shopModalRoot.Q<Button>("btnShopBuy");
+            if (buy != null)
+            {
+                target = buy;
+                return true;
+            }
+
+            // 2) Пытаемся найти первую кнопку покупки в legacy-списке
             var list = _shopModalRoot.Q<VisualElement>("shopList");
             if (list != null)
             {
@@ -1354,7 +2610,15 @@ namespace Gironoid._Project.Code.UI.Hangar
                 }
             }
 
-            // 2) Если нет списка/кнопок — подсветим rewarded (если есть)
+            // 3) Если нет кнопки покупки — подсветим список кораблей
+            var shipsList = _shopModalRoot.Q<ListView>("shopShipsList");
+            if (shipsList != null)
+            {
+                target = shipsList;
+                return true;
+            }
+
+            // 4) Если нет списка/кнопок — подсветим rewarded (если есть)
             var watch = _shopModalRoot.Q<Button>("btnWatchAdTokens");
             if (watch != null)
             {
@@ -1362,7 +2626,14 @@ namespace Gironoid._Project.Code.UI.Hangar
                 return true;
             }
 
-            // 3) Фоллбек — весь модал
+            var watchModern = _shopModalRoot.Q<Button>("btnWatchAd");
+            if (watchModern != null)
+            {
+                target = watchModern;
+                return true;
+            }
+
+            // 5) Фоллбек — весь модал
             target = _shopModalRoot;
             return true;
         }
@@ -1385,54 +2656,27 @@ namespace Gironoid._Project.Code.UI.Hangar
             if (!hasShip)
             {
                 ShowAction("Сначала купите корабль в магазине.");
-                SetTutorialStepAtLeast(1);
+                SetTutorialStepExact(TutorialStepBuyFirstShip);
                 UpdateTutorialOverlay();
                 return;
             }
 
-            if (!HasAnyItemOfType(p, ItemType.Weapon))
+            if (IsFirstShipPopupVisible())
             {
-                var defId = cfg.ItemCatalog.StarterWeaponDefinitionId;
-                var res = GironoidApp.Hangar.CraftItem(defId, ironCost: 25, tokenCost: 0, out var crafted, flushToServer: ShouldFlushToServer());
-                if (res.Ok)
-                {
-                    ShowAction($"Оружие создано: {crafted.DefinitionId} • Lv{crafted.Level} • {crafted.Quality}");
-                    SetTutorialStepAtLeast(4);
-                    InvalidateInventoryAndEquippedCaches();
-                    RefreshAll(force: true);
-                }
-                else
-                {
-                    ShowAction(string.IsNullOrEmpty(res.Error) ? "Ошибка крафта оружия." : res.Error);
-                }
-
-                ShowOnboardingHint();
+                ShowAction("Сначала нажмите «Понятно» в подсказке о первом корабле.");
                 UpdateTutorialOverlay();
                 return;
             }
 
-            if (!HasAnyItemOfType(p, ItemType.Engine))
+            if (p.TutorialStep < TutorialStepFirstShipConfirmed)
             {
-                var defId = cfg.ItemCatalog.StarterEngineDefinitionId;
-                var res = GironoidApp.Hangar.CraftItem(defId, ironCost: 25, tokenCost: 0, out var crafted, flushToServer: ShouldFlushToServer());
-                if (res.Ok)
-                {
-                    ShowAction($"Двигатель создан: {crafted.DefinitionId} • Lv{crafted.Level} • {crafted.Quality}");
-                    SetTutorialStepAtLeast(5);
-                    InvalidateInventoryAndEquippedCaches();
-                    RefreshAll(force: true);
-                }
-                else
-                {
-                    ShowAction(string.IsNullOrEmpty(res.Error) ? "Ошибка крафта двигателя." : res.Error);
-                }
-
-                ShowOnboardingHint();
+                ShowAction("Сначала завершите этап покупки первого корабля.");
                 UpdateTutorialOverlay();
                 return;
             }
 
-            ShowAction("Крафт: базовые предметы уже созданы.");
+            OpenCraftModal();
+            ShowOnboardingHint();
             UpdateTutorialOverlay();
         }
 
@@ -1451,38 +2695,80 @@ namespace Gironoid._Project.Code.UI.Hangar
             var p = GironoidApp.Profile;
             if (p == null) return;
 
-            int step = p.TutorialStep;
+            var cfg = GironoidApp.Config;
+            bool hasShip = p.OwnedShips != null && p.OwnedShips.Count > 0;
 
-            if (step < 3)
+            if (!hasShip)
             {
                 ShowAction("Шаг 1: Откройте «Магазин» и купите первый корабль.");
                 return;
             }
 
-            if (!HasAnyItemOfType(p, ItemType.Weapon))
+            if (p.TutorialStep <= TutorialStepShipPurchased && IsShopOpen())
             {
-                ShowAction("Шаг 2: Нажмите «Крафт», чтобы создать оружие.");
+                ShowAction("Корабль куплен. Закройте магазин, чтобы продолжить обучение.");
                 return;
             }
 
-            if (!HasAnyItemOfType(p, ItemType.Engine))
+            if (IsFirstShipPopupVisible())
             {
-                ShowAction("Шаг 3: Нажмите «Крафт», чтобы создать двигатель.");
+                ShowAction("Нажмите «Понятно», чтобы перейти к настройке корабля.");
                 return;
             }
 
-            var cfg = GironoidApp.Config;
+            if (p.TutorialStep <= TutorialStepShipPurchased)
+            {
+                ShowAction("Завершите шаг с первым кораблём: откройте магазин, купите корабль и закройте окно магазина.");
+                return;
+            }
+
+            if (IsCraftModalVisible())
+            {
+                string requiredDefId = GetRequiredTutorialCraftDefinitionId(p, cfg);
+                if (!string.IsNullOrEmpty(requiredDefId))
+                {
+                    var requiredType = GetRequiredCraftTypeByDefinition(requiredDefId, cfg);
+                    string requiredName = GetCraftDefinitionDisplayName(cfg, requiredDefId);
+
+                    if (_craftSelectedType != requiredType)
+                    {
+                        ShowAction($"Крафт: выберите вкладку «{ItemTypeToRu(requiredType)}».");
+                        return;
+                    }
+
+                    if (_craftSelectedBlueprint == null || _craftSelectedBlueprint.DefinitionId != requiredDefId)
+                    {
+                        ShowAction($"Крафт: выберите чертёж «{requiredName}».");
+                        return;
+                    }
+
+                    ShowAction($"Крафт: нажмите «Крафт» для «{requiredName}». В обучении шанс 100%.");
+                    return;
+                }
+
+                ShowAction("Закройте окно крафта и перейдите к установке модулей.");
+                return;
+            }
+
+            string requiredCraftDef = GetRequiredTutorialCraftDefinitionId(p, cfg);
+            if (!string.IsNullOrEmpty(requiredCraftDef))
+            {
+                string requiredName = GetCraftDefinitionDisplayName(cfg, requiredCraftDef);
+                ShowAction($"Шаг 3: Нажмите «Крафт» и создайте «{requiredName}».");
+                return;
+            }
+
             var shipId = ResolveSelectedShipId(p, cfg);
 
             if (!HasAnyEquipped(p, shipId, ItemType.Engine))
             {
-                ShowAction("Шаг 4: Установите двигатель (E1 → выбрать двигатель в списке).");
+                ShowAction("Шаг 4: Установите двигатель (E1 → выбрать двигатель в списке → Установить).");
                 return;
             }
 
             if (!HasAnyEquipped(p, shipId, ItemType.Weapon))
             {
-                ShowAction("Шаг 5: Установите оружие (W1 → выбрать оружие в списке).");
+                ShowAction("Шаг 5: Установите оружие (W1 → выбрать орудие в списке → Установить).");
                 return;
             }
 
@@ -1494,55 +2780,140 @@ namespace Gironoid._Project.Code.UI.Hangar
             if (_tutorial == null || !GironoidApp.IsReady)
                 return;
 
-            // Если открыт внешний магазин — оверлей ангара неактуален.
+            var p = GironoidApp.Profile;
+            var cfg = GironoidApp.Config;
+            if (p == null || cfg == null)
+                return;
+
+            // Для внешнего магазина root ангара скрыт, поэтому оверлей неактуален.
             if (_externalShopOpen)
             {
                 _tutorial.Hide();
                 return;
             }
 
-            var p = GironoidApp.Profile;
-            var cfg = GironoidApp.Config;
-            if (p == null || cfg == null)
+            if (IsFirstShipPopupVisible())
+            {
+                if (_firstShipPopupOk != null)
+                {
+                    _tutorial.Show(_firstShipPopupOk, "Нажмите «Понятно», чтобы перейти к крафту.");
+                    return;
+                }
+                _tutorial.Hide();
                 return;
+            }
 
             bool hasShip = p.OwnedShips != null && p.OwnedShips.Count > 0;
+            bool shopOpen = IsShopOpen();
 
             if (!hasShip)
             {
-                if (IsShopOpen())
+                if (shopOpen)
                 {
-                    SetShopCloseAllowed(false);
-
-                    if (TryGetShopPrimaryActionTarget(out var target) && target != null)
+                    SetShopCloseAllowed(true);
+                    if (TryGetShopPrimaryActionTarget(out var buyTarget) && buyTarget != null)
                     {
-                        _tutorial.Show(target, "Сделайте первую покупку в магазине. Во время обучения доступно только подсвеченное действие.");
+                        _tutorial.Show(
+                            buyTarget,
+                            "Купите первый корабль. При необходимости можно вернуться в ангар.",
+                            padding: 12f,
+                            tooltipOffset: 12f,
+                            blockInput: false);
+                        return;
+                    }
+                }
+                else
+                {
+                    SetShopCloseAllowed(true);
+                    if (_btnShop != null)
+                    {
+                        _tutorial.Show(_btnShop, "Нажмите «Магазин». Во время обучения можно нажимать только подсвеченную кнопку.");
                         return;
                     }
                 }
 
+                _tutorial.Hide();
+                return;
+            }
+
+            if (shopOpen)
+            {
                 SetShopCloseAllowed(true);
 
-                if (_btnShop != null)
+                if (p.TutorialStep <= TutorialStepShipPurchased &&
+                    TryGetShopCloseTarget(out var closeTarget) &&
+                    closeTarget != null)
                 {
-                    _tutorial.Show(_btnShop, "Нажмите «Магазин». Во время обучения можно нажимать только подсвеченную кнопку.");
+                    _tutorial.Show(
+                        closeTarget,
+                        "Корабль куплен. Закройте магазин, чтобы продолжить обучение.",
+                        padding: 12f,
+                        tooltipOffset: 12f,
+                        blockInput: false);
                     return;
                 }
+
+                _tutorial.Hide();
+                return;
             }
 
             SetShopCloseAllowed(true);
 
-            if (!HasAnyItemOfType(p, ItemType.Weapon))
+            if (p.TutorialStep <= TutorialStepShipPurchased)
             {
-                if (_btnCraft != null)
-                    _tutorial.Show(_btnCraft, "Нажмите «Крафт», чтобы создать оружие.");
+                _tutorial.Hide();
                 return;
             }
 
-            if (!HasAnyItemOfType(p, ItemType.Engine))
+            if (IsCraftModalVisible())
+            {
+                string requiredDefId = GetRequiredTutorialCraftDefinitionId(p, cfg);
+                if (!string.IsNullOrEmpty(requiredDefId))
+                {
+                    ItemType requiredType = GetRequiredCraftTypeByDefinition(requiredDefId, cfg);
+                    string requiredName = GetCraftDefinitionDisplayName(cfg, requiredDefId);
+
+                    if (_craftSelectedType != requiredType)
+                    {
+                        var tabTarget = GetCraftTabButton(requiredType);
+                        if (tabTarget != null)
+                        {
+                            _tutorial.Show(tabTarget, $"Откройте вкладку «{ItemTypeToRu(requiredType)}».");
+                            return;
+                        }
+                    }
+
+                    if (_craftSelectedBlueprint == null || _craftSelectedBlueprint.DefinitionId != requiredDefId)
+                    {
+                        if (_craftBlueprintsList != null)
+                        {
+                            _tutorial.Show(_craftBlueprintsList, $"Выберите чертёж «{requiredName}».");
+                            return;
+                        }
+                    }
+
+                    if (_craftModalAction != null)
+                    {
+                        _tutorial.Show(_craftModalAction, "Нажмите «Крафт». Во время обучения шанс успеха 100%.");
+                        return;
+                    }
+                }
+
+                if (_craftModalClose != null)
+                {
+                    _tutorial.Show(_craftModalClose, "Закройте окно крафта, чтобы вернуться в ангар.");
+                    return;
+                }
+
+                _tutorial.Hide();
+                return;
+            }
+
+            string requiredCraftDef = GetRequiredTutorialCraftDefinitionId(p, cfg);
+            if (!string.IsNullOrEmpty(requiredCraftDef))
             {
                 if (_btnCraft != null)
-                    _tutorial.Show(_btnCraft, "Нажмите «Крафт», чтобы создать двигатель.");
+                    _tutorial.Show(_btnCraft, $"Нажмите «Крафт», чтобы создать «{GetCraftDefinitionDisplayName(cfg, requiredCraftDef)}».");
                 return;
             }
 
@@ -1564,7 +2935,14 @@ namespace Gironoid._Project.Code.UI.Hangar
                 }
 
                 if (_inventoryList != null)
-                    _tutorial.Show(_inventoryList, "Выберите двигатель в списке справа.");
+                {
+                    if (_selectedItem == null || _selectedItem.Type != ItemType.Engine)
+                        _tutorial.Show(_inventoryList, "Выберите двигатель в списке справа.");
+                    else if (_btnEquip != null)
+                        _tutorial.Show(_btnEquip, "Нажмите «Установить», чтобы поставить двигатель.");
+                    else
+                        _tutorial.Show(_inventoryList, "Подтвердите установку двигателя.");
+                }
                 return;
             }
 
@@ -1578,14 +2956,21 @@ namespace Gironoid._Project.Code.UI.Hangar
                 }
 
                 if (_inventoryList != null)
-                    _tutorial.Show(_inventoryList, "Выберите оружие в списке справа.");
+                {
+                    if (_selectedItem == null || _selectedItem.Type != ItemType.Weapon)
+                        _tutorial.Show(_inventoryList, "Выберите оружие в списке справа.");
+                    else if (_btnEquip != null)
+                        _tutorial.Show(_btnEquip, "Нажмите «Установить», чтобы поставить оружие.");
+                    else
+                        _tutorial.Show(_inventoryList, "Подтвердите установку оружия.");
+                }
                 return;
             }
 
             if (_btnFinish != null)
                 _tutorial.Show(_btnFinish, "Нажмите «Готово» для перехода на звёздную карту.");
 
-            SetTutorialStepAtLeast(7);
+            SetTutorialStepAtLeast(TutorialStepStarterWeaponEquipped);
         }
 
         private void SetTutorialStepAtLeast(int step)
@@ -1598,6 +2983,93 @@ namespace Gironoid._Project.Code.UI.Hangar
                 if (p.TutorialStep < step)
                     p.TutorialStep = step;
             }, flushToServer: ShouldFlushToServer());
+        }
+
+        private void SetTutorialStepExact(int step)
+        {
+            var ps = GironoidApp.ProfileService;
+            if (ps == null || ps.Profile == null)
+                return;
+
+            if (ps.Profile.TutorialStep == step)
+                return;
+
+            ps.Apply(p => p.TutorialStep = step, flushToServer: ShouldFlushToServer());
+        }
+
+        private string GetRequiredTutorialCraftDefinitionId(PlayerProfile p, GameConfig cfg)
+        {
+            if (p == null || cfg == null || cfg.ItemCatalog == null)
+                return null;
+
+            var cat = cfg.ItemCatalog;
+
+            if (!HasStarterEngineCrafted(p))
+                return cat.StarterEngineDefinitionId;
+
+            if (!HasStarterWeaponCrafted(p))
+                return cat.StarterWeaponDefinitionId;
+
+            return null;
+        }
+
+        private bool HasStarterEngineCrafted(PlayerProfile p)
+        {
+            var cfg = GironoidApp.Config;
+            if (cfg == null || cfg.ItemCatalog == null)
+                return HasAnyItemOfType(p, ItemType.Engine);
+
+            return HasDefinitionInInventory(p, cfg.ItemCatalog.StarterEngineDefinitionId);
+        }
+
+        private bool HasStarterWeaponCrafted(PlayerProfile p)
+        {
+            var cfg = GironoidApp.Config;
+            if (cfg == null || cfg.ItemCatalog == null)
+                return HasAnyItemOfType(p, ItemType.Weapon);
+
+            return HasDefinitionInInventory(p, cfg.ItemCatalog.StarterWeaponDefinitionId);
+        }
+
+        private static bool HasDefinitionInInventory(PlayerProfile p, string definitionId)
+        {
+            if (p == null || p.Inventory == null || string.IsNullOrEmpty(definitionId))
+                return false;
+
+            for (int i = 0; i < p.Inventory.Count; i++)
+            {
+                var it = p.Inventory[i];
+                if (it != null && string.Equals(it.DefinitionId, definitionId, StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static ItemType GetRequiredTutorialEquipType(PlayerProfile p, string shipId)
+        {
+            if (p == null || string.IsNullOrEmpty(shipId))
+                return ItemType.None;
+
+            if (!HasAnyEquipped(p, shipId, ItemType.Engine))
+                return ItemType.Engine;
+
+            if (!HasAnyEquipped(p, shipId, ItemType.Weapon))
+                return ItemType.Weapon;
+
+            return ItemType.None;
+        }
+
+        private Button GetCraftTabButton(ItemType type)
+        {
+            switch (type)
+            {
+                case ItemType.Weapon: return _craftTabWeapons;
+                case ItemType.Shield: return _craftTabShields;
+                case ItemType.Engine: return _craftTabEngines;
+                case ItemType.Modifier: return _craftTabModifiers;
+                default: return null;
+            }
         }
 
         private void InvalidateCaches()
@@ -1740,6 +3212,19 @@ namespace Gironoid._Project.Code.UI.Hangar
             }
 
             return false;
+        }
+
+        [Serializable]
+        private sealed class CraftBlueprintVm
+        {
+            public string DefinitionId;
+            public string NameRu;
+            public ItemType Type;
+            public int IronCost;
+            public int TokenCost;
+            public float AverageChance;
+            public string Title;
+            public string Subtitle;
         }
 
         [Serializable]

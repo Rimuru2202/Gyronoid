@@ -68,7 +68,8 @@ namespace Gironoid._Project.Code.Core.Services
         {
             bool started =
                 TryShowRewardedViaUserBridge(placement, onRewarded, onClosed, onError) ||
-                TryShowRewardedViaAgava(placement, onRewarded, onClosed, onError);
+                TryShowRewardedViaAgava(placement, onRewarded, onClosed, onError) ||
+                TryShowRewardedViaYg2(placement, onRewarded, onClosed, onError);
 
             if (!started)
             {
@@ -183,10 +184,14 @@ namespace Gironoid._Project.Code.Core.Services
         {
             ParameterInfo[] ps = method.GetParameters();
             object[] args = new object[ps.Length];
+            bool rewardedMode = onRewarded != null;
+            int actionOrdinal = 0;
+            bool rewardAssigned = false;
 
             for (int i = 0; i < ps.Length; i++)
             {
                 Type pType = ps[i].ParameterType;
+                string pName = ps[i].Name ?? string.Empty;
 
                 if (pType == typeof(string))
                 {
@@ -196,20 +201,41 @@ namespace Gironoid._Project.Code.Core.Services
 
                 if (pType == typeof(Action))
                 {
-                    // heuristic: если rewarded есть и мы ещё не вставляли onRewarded — вставим его первым Action,
-                    // а onClosed — вторым. Иначе — onClosed.
-                    if (onRewarded != null && !ArgsContainsAction(args, onRewarded) && !ArgsContainsAnyAction(args))
+                    Action mapped = null;
+
+                    if (rewardedMode)
                     {
-                        args[i] = onRewarded;
-                    }
-                    else if (onRewarded != null && !ArgsContainsAction(args, onClosed) && ArgsContainsAction(args, onRewarded))
-                    {
-                        args[i] = onClosed;
+                        if (LooksLikeRewardCallbackName(pName))
+                        {
+                            mapped = onRewarded;
+                            rewardAssigned = true;
+                        }
+                        else if (LooksLikeCloseCallbackName(pName))
+                        {
+                            mapped = onClosed;
+                        }
+                        else if (LooksLikeOpenCallbackName(pName))
+                        {
+                            mapped = null;
+                        }
+                        else if (actionOrdinal == 1 && !rewardAssigned)
+                        {
+                            // Conservative fallback: reward only on the 2nd Action (typical: onOpen, onRewarded, onClose).
+                            mapped = onRewarded;
+                            rewardAssigned = true;
+                        }
+                        else
+                        {
+                            mapped = onClosed;
+                        }
                     }
                     else
                     {
-                        args[i] = onClosed;
+                        mapped = LooksLikeOpenCallbackName(pName) ? null : onClosed;
                     }
+
+                    args[i] = mapped;
+                    actionOrdinal++;
                     continue;
                 }
 
@@ -236,23 +262,28 @@ namespace Gironoid._Project.Code.Core.Services
             }
         }
 
-        private static bool ArgsContainsAnyAction(object[] args)
+        private static bool LooksLikeRewardCallbackName(string name)
         {
-            for (int i = 0; i < args.Length; i++)
-            {
-                if (args[i] is Action) return true;
-            }
-            return false;
+            if (string.IsNullOrEmpty(name)) return false;
+            return name.IndexOf("reward", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   name.IndexOf("success", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static bool ArgsContainsAction(object[] args, Action a)
+        private static bool LooksLikeCloseCallbackName(string name)
         {
-            if (a == null) return false;
-            for (int i = 0; i < args.Length; i++)
-            {
-                if (ReferenceEquals(args[i], a)) return true;
-            }
-            return false;
+            if (string.IsNullOrEmpty(name)) return false;
+            return name.IndexOf("close", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   name.IndexOf("done", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   name.IndexOf("finish", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   name.IndexOf("complete", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool LooksLikeOpenCallbackName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return name.IndexOf("open", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   name.IndexOf("start", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   name.IndexOf("show", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         // -------------------------- Agava.YandexGames via reflection --------------------------
@@ -312,29 +343,253 @@ namespace Gironoid._Project.Code.Core.Services
             return false;
         }
 
+        // -------------------------- PluginYG2 (YG.YG2) via reflection --------------------------
+
+        private bool TryShowRewardedViaYg2(string placement, Action onRewarded, Action onClosed, Action<string> onError)
+        {
+            Type yg2Type = ResolveType(new[]
+            {
+                "YG.YG2, Assembly-CSharp",
+                "YG.YG2, Assembly-CSharp-firstpass",
+                "YG.YG2"
+            });
+
+            if (yg2Type == null)
+                return false;
+
+            string rewardId = string.IsNullOrWhiteSpace(placement) ? "shop_reward_tokens" : placement.Trim();
+
+            bool rewardedIssued = false;
+            Action issueRewardOnce = () =>
+            {
+                if (rewardedIssued) return;
+                rewardedIssued = true;
+                onRewarded?.Invoke();
+            };
+
+            Action onOpenRewarded = null;
+            Action onCloseRewarded = null;
+            Action onErrorRewarded = null;
+            Action<string> onRewardAdv = null;
+
+            bool cleaned = false;
+            void Cleanup()
+            {
+                if (cleaned) return;
+                cleaned = true;
+
+                TryRemoveStaticAction(yg2Type, "onOpenRewardedAdv", onOpenRewarded);
+                TryRemoveStaticAction(yg2Type, "onCloseRewardedAdv", onCloseRewarded);
+                TryRemoveStaticAction(yg2Type, "onErrorRewardedAdv", onErrorRewarded);
+                TryRemoveStaticActionString(yg2Type, "onRewardAdv", onRewardAdv);
+            }
+
+            onOpenRewarded = () => { };
+            onCloseRewarded = () =>
+            {
+                onClosed?.Invoke();
+                Cleanup();
+            };
+            onErrorRewarded = () =>
+            {
+                onError?.Invoke("rewarded_error");
+                Cleanup();
+            };
+            onRewardAdv = id =>
+            {
+                if (!string.IsNullOrEmpty(rewardId) &&
+                    !string.IsNullOrEmpty(id) &&
+                    !string.Equals(id, rewardId, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                issueRewardOnce();
+            };
+
+            TryAddStaticAction(yg2Type, "onOpenRewardedAdv", onOpenRewarded);
+            TryAddStaticAction(yg2Type, "onCloseRewardedAdv", onCloseRewarded);
+            TryAddStaticAction(yg2Type, "onErrorRewardedAdv", onErrorRewarded);
+            TryAddStaticActionString(yg2Type, "onRewardAdv", onRewardAdv);
+
+            if (!TryInvokeYg2RewardedShow(yg2Type, rewardId, issueRewardOnce))
+            {
+                Cleanup();
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool TryInvokeYg2RewardedShow(Type yg2Type, string rewardId, Action onRewarded)
+        {
+            var shows = yg2Type.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(m => m.Name == "RewardedAdvShow")
+                .ToArray();
+
+            if (shows.Length == 0)
+                return false;
+
+            for (int i = 0; i < shows.Length; i++)
+            {
+                var m = shows[i];
+                var ps = m.GetParameters();
+                if (ps.Length == 2 &&
+                    ps[0].ParameterType == typeof(string) &&
+                    ps[1].ParameterType == typeof(Action))
+                {
+                    try
+                    {
+                        m.Invoke(null, new object[] { rewardId, onRewarded });
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        LogVerbose($"YG2 rewarded invoke failed (with callback): {e.GetType().Name}: {e.Message}");
+                    }
+                }
+            }
+
+            for (int i = 0; i < shows.Length; i++)
+            {
+                var m = shows[i];
+                var ps = m.GetParameters();
+                if (ps.Length == 1 && ps[0].ParameterType == typeof(string))
+                {
+                    try
+                    {
+                        m.Invoke(null, new object[] { rewardId });
+                        return true;
+                    }
+                    catch (Exception e)
+                    {
+                        LogVerbose($"YG2 rewarded invoke failed: {e.GetType().Name}: {e.Message}");
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryAddStaticAction(Type type, string fieldName, Action handler)
+        {
+            if (type == null || handler == null || string.IsNullOrEmpty(fieldName))
+                return false;
+
+            try
+            {
+                var f = type.GetField(fieldName, BindingFlags.Public | BindingFlags.Static);
+                if (f == null || f.FieldType != typeof(Action))
+                    return false;
+
+                var current = (Action)f.GetValue(null);
+                current += handler;
+                f.SetValue(null, current);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void TryRemoveStaticAction(Type type, string fieldName, Action handler)
+        {
+            if (type == null || handler == null || string.IsNullOrEmpty(fieldName))
+                return;
+
+            try
+            {
+                var f = type.GetField(fieldName, BindingFlags.Public | BindingFlags.Static);
+                if (f == null || f.FieldType != typeof(Action))
+                    return;
+
+                var current = (Action)f.GetValue(null);
+                if (current == null) return;
+                current -= handler;
+                f.SetValue(null, current);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        private static bool TryAddStaticActionString(Type type, string fieldName, Action<string> handler)
+        {
+            if (type == null || handler == null || string.IsNullOrEmpty(fieldName))
+                return false;
+
+            try
+            {
+                var f = type.GetField(fieldName, BindingFlags.Public | BindingFlags.Static);
+                if (f == null || f.FieldType != typeof(Action<string>))
+                    return false;
+
+                var current = (Action<string>)f.GetValue(null);
+                current += handler;
+                f.SetValue(null, current);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void TryRemoveStaticActionString(Type type, string fieldName, Action<string> handler)
+        {
+            if (type == null || handler == null || string.IsNullOrEmpty(fieldName))
+                return;
+
+            try
+            {
+                var f = type.GetField(fieldName, BindingFlags.Public | BindingFlags.Static);
+                if (f == null || f.FieldType != typeof(Action<string>))
+                    return;
+
+                var current = (Action<string>)f.GetValue(null);
+                if (current == null) return;
+                current -= handler;
+                f.SetValue(null, current);
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
         private bool TryInvokeAgavaShow(MethodInfo showMethod, string placement, Action onClosed, Action onRewarded, Action<string> onError)
         {
             ParameterInfo[] ps = showMethod.GetParameters();
             object[] args = new object[ps.Length];
+            bool rewardedMode = onRewarded != null;
+            int actionOrdinal = 0;
 
             // На практике у Agava чаще всего:
             // Interstitial: Show(Action onOpen, Action onClose, Action<string> onError, Action onOffline)
             // Rewarded:     Show(Action onOpen, Action onRewarded, Action onClose, Action<string> onError)
-            // Но мы не "знаем" наверняка — поэтому подставляем только совместимые типы.
+            // Здесь используем строгий порядок и никогда не маппим награду на onOpen.
             for (int i = 0; i < ps.Length; i++)
             {
                 Type pType = ps[i].ParameterType;
 
                 if (pType == typeof(Action))
                 {
-                    // Эвристика: если rewarded задан — второй Action обычно onRewarded
-                    // Но мы не можем гарантировать, поэтому:
-                    // - если onRewarded ещё не вставили и это не первый Action -> вставим onRewarded
-                    // - иначе onClosed
-                    if (onRewarded != null && !ArgsContainsAction(args, onRewarded) && i > 0)
-                        args[i] = onRewarded;
+                    if (!rewardedMode)
+                    {
+                        // Interstitial: [0]=onOpen, [1]=onClose, [2+]=ignored
+                        args[i] = actionOrdinal == 1 ? onClosed : null;
+                    }
                     else
-                        args[i] = onClosed;
+                    {
+                        // Rewarded: [0]=onOpen, [1]=onRewarded, [2]=onClose, [3+]=ignored
+                        if (actionOrdinal == 1) args[i] = onRewarded;
+                        else if (actionOrdinal == 2) args[i] = onClosed;
+                        else args[i] = null;
+                    }
+
+                    actionOrdinal++;
 
                     continue;
                 }

@@ -90,7 +90,14 @@ namespace Gironoid._Project.Code.Core.Services
             return Result.Success();
         }
 
-        public static Result TryCraftItem(PlayerProfile p, GameConfig cfg, string definitionId, int ironCost, int tokenCost, out ItemInstance crafted)
+        public static Result TryCraftItem(
+            PlayerProfile p,
+            GameConfig cfg,
+            string definitionId,
+            int ironCost,
+            int tokenCost,
+            out ItemInstance crafted,
+            float successChanceOverride = -1f)
         {
             crafted = null;
 
@@ -115,6 +122,15 @@ namespace Gironoid._Project.Code.Core.Services
 
             int level = RollCraftLevel();
             var quality = RollCraftQuality();
+            float successChance = successChanceOverride >= 0f
+                ? Mathf.Clamp01(successChanceOverride)
+                : GetCraftSuccessChanceForQuality(quality);
+
+            if (Random.value > successChance)
+            {
+                int chancePercent = Mathf.RoundToInt(successChance * 100f);
+                return Result.Fail($"Крафт не удался ({chancePercent}%). Материалы потрачены.");
+            }
 
             var inst = def.CreateInstance(level: level, quality: quality, isProtected: false);
 
@@ -128,6 +144,30 @@ namespace Gironoid._Project.Code.Core.Services
             return Result.Success();
         }
 
+        public static float GetCraftSuccessChanceForQuality(ItemQuality quality)
+        {
+            switch (quality)
+            {
+                case ItemQuality.Common: return 0.92f;
+                case ItemQuality.Uncommon: return 0.78f;
+                case ItemQuality.Rare: return 0.56f;
+                case ItemQuality.Epic: return 0.34f;
+                case ItemQuality.Legendary: return 0.18f;
+                default: return 0.92f;
+            }
+        }
+
+        public static float GetCraftAverageSuccessChance()
+        {
+            // Матожидание по текущему распределению качества из RollCraftQuality.
+            return
+                0.70f * GetCraftSuccessChanceForQuality(ItemQuality.Common) +
+                0.20f * GetCraftSuccessChanceForQuality(ItemQuality.Uncommon) +
+                0.08f * GetCraftSuccessChanceForQuality(ItemQuality.Rare) +
+                0.018f * GetCraftSuccessChanceForQuality(ItemQuality.Epic) +
+                0.002f * GetCraftSuccessChanceForQuality(ItemQuality.Legendary);
+        }
+
         public static Result TryEquip(PlayerProfile p, GameConfig cfg, string shipId, int slotIndex, ItemType type, string instanceId)
         {
             if (p == null) return Result.Fail("Профиль не задан.");
@@ -139,6 +179,13 @@ namespace Gironoid._Project.Code.Core.Services
 
             var ship = p.GetShip(shipId);
             if (ship == null) return Result.Fail("Корабль не найден.");
+
+            var slotCap = ResolveSlotCap(cfg, shipId, ship.Rank, type);
+            if (slotCap <= 0)
+                return Result.Fail("Слот этого типа недоступен для текущего корабля.");
+
+            if (slotIndex >= slotCap)
+                return Result.Fail("Этот слот закрыт для текущего ранга корабля.");
 
             if (!p.TryGetItem(instanceId, out var item) || item == null)
                 return Result.Fail("Предмет не найден в инвентаре.");
@@ -166,6 +213,24 @@ namespace Gironoid._Project.Code.Core.Services
 
             ship.Set(type, slotIndex, instanceId);
             return Result.Success();
+        }
+
+        private static int ResolveSlotCap(GameConfig cfg, string shipId, int mk, ItemType type)
+        {
+            if (cfg == null || cfg.ShipCatalog == null || string.IsNullOrEmpty(shipId))
+                return 0;
+
+            if (!cfg.ShipCatalog.TryGetTier(shipId, Mathf.Clamp(mk, 1, 4), out var tier))
+                return 0;
+
+            switch (type)
+            {
+                case ItemType.Weapon: return Mathf.Clamp(tier.Slots.WeaponSlots, 0, 4);
+                case ItemType.Shield: return Mathf.Clamp(tier.Slots.ShieldSlots, 0, 4);
+                case ItemType.Engine: return Mathf.Clamp(tier.Slots.EngineSlots, 0, 4);
+                case ItemType.Modifier: return Mathf.Clamp(tier.Slots.ModSlots, 0, 4);
+                default: return 0;
+            }
         }
 
         public static Result TryDismantle(PlayerProfile p, GameConfig cfg, string instanceId, out DismantleGain gain)

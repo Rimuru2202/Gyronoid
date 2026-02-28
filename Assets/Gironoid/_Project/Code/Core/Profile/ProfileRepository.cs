@@ -80,9 +80,13 @@ namespace Gironoid._Project.Code.Core.Profile
                 File.WriteAllText(tmp, json);
 
                 if (File.Exists(_path))
-                    File.Delete(_path);
-
-                File.Move(tmp, _path);
+                {
+                    File.Replace(tmp, _path, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                }
+                else
+                {
+                    File.Move(tmp, _path);
+                }
             }
             catch
             {

@@ -181,7 +181,7 @@ Transform:
   m_GameObject: {fileID: 774446695}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.73760396, y: -0.21692738, z: -0.05389}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -466,7 +466,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _profileService: {fileID: 1730661214}
   _ads: {fileID: 1730661210}
-  _rewardedTokensAmount: 120
+  _rewardedTokensAmount: 10
   _rewardedPlacement: shop_reward_tokens
   _showInterstitialOnClose: 1
   _interstitialPlacement: shop_close

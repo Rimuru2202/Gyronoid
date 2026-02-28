@@ -52,7 +52,44 @@ namespace Gironoid._Project.Code.Core.Services
 
             _profile.Apply(p =>
             {
-                result = HangarLogic.TryCraftItem(p, _cfg, definitionId, ironCost, tokenCost, out local);
+                result = HangarLogic.TryCraftItem(
+                    p,
+                    _cfg,
+                    definitionId,
+                    ironCost,
+                    tokenCost,
+                    out local,
+                    successChanceOverride: -1f);
+            }, flushToServer);
+
+            crafted = local;
+            return result;
+        }
+
+        public HangarLogic.Result CraftItemWithChanceOverride(
+            string definitionId,
+            int ironCost,
+            int tokenCost,
+            float successChanceOverride,
+            out ItemInstance crafted,
+            bool flushToServer = false)
+        {
+            crafted = null;
+            if (_profile == null || _profile.Profile == null) return HangarLogic.Result.Fail("Профиль не готов.");
+
+            HangarLogic.Result result = default;
+            ItemInstance local = null;
+
+            _profile.Apply(p =>
+            {
+                result = HangarLogic.TryCraftItem(
+                    p,
+                    _cfg,
+                    definitionId,
+                    ironCost,
+                    tokenCost,
+                    out local,
+                    successChanceOverride: successChanceOverride);
             }, flushToServer);
 
             crafted = local;

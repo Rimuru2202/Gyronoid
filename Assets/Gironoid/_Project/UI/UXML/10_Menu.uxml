@@ -18,7 +18,7 @@
             </ui:VisualElement>
 
             <!-- декоративные линии (под стиль из Figma, можно оформить в USS) -->
-            <ui:VisualElement class="topbar-decor-lines">
+            <ui:VisualElement class="topbar-decor-lines" picking-mode="Ignore">
                 <ui:VisualElement class="topbar-line topbar-line--a" />
                 <ui:VisualElement class="topbar-line topbar-line--b" />
             </ui:VisualElement>

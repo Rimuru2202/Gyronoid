@@ -5,6 +5,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Gironoid._Project.Code.Core.Services;
+using Gironoid._Project.Code.Core.Visual;
 
 // OPTIONAL: если GironoidApp есть в проекте (почти наверняка есть).
 // Мы используем его ТОЛЬКО через reflection-safe участки (не ломающие сборку из-за сигнатур).
@@ -58,6 +59,7 @@ namespace Gironoid._Project.Code.UI.Shared
         private const string NameLblShipStats = "lblShopShipStats";
         private const string NameLblShipPrice = "lblShopShipPrice";
         private const string NameLblShipStatus = "lblShopShipStatus";
+        private const string NameShipIconPreview = "shopShipIconPreview";
 
         // ---- Modal overlay classes (from your UXML) ----
         private const string ClassModalBackground = "modal-bg";
@@ -88,6 +90,7 @@ namespace Gironoid._Project.Code.UI.Shared
         private Label _lblShipStats;
         private Label _lblShipPrice;
         private Label _lblShipStatus;
+        private VisualElement _shipIconPreview;
 
         // Overlay specifics (for hangar modal)
         private VisualElement _modalBg;
@@ -142,7 +145,7 @@ namespace Gironoid._Project.Code.UI.Shared
             EnsureOverlayConfiguredIfNeeded();
 
             // ---- Try advanced layout ----
-            _shopScreenRoot = _modalRoot.Q<VisualElement>(NameShopScreenRoot) ?? _modalRoot; // в модалке shopScreen может быть вложен или отсутствовать
+                _shopScreenRoot = _modalRoot.Q<VisualElement>(NameShopScreenRoot) ?? _modalRoot; // в модалке shopScreen может быть вложен или отсутствовать
             _shipsList = _shopScreenRoot.Q<ListView>(NameShipsList);
             _btnBuy = _shopScreenRoot.Q<Button>(NameBtnBuy);
             _btnWatchAd = _shopScreenRoot.Q<Button>(NameBtnWatchAd);
@@ -152,6 +155,7 @@ namespace Gironoid._Project.Code.UI.Shared
             _lblShipStats = _shopScreenRoot.Q<Label>(NameLblShipStats);
             _lblShipPrice = _shopScreenRoot.Q<Label>(NameLblShipPrice);
             _lblShipStatus = _shopScreenRoot.Q<Label>(NameLblShipStatus);
+            _shipIconPreview = _shopScreenRoot.Q<VisualElement>(NameShipIconPreview);
 
             _useAdvanced = (_shipsList != null && _btnBuy != null);
             if (_useAdvanced)
@@ -266,6 +270,8 @@ namespace Gironoid._Project.Code.UI.Shared
 
         private void RebuildUi()
         {
+            _shop?.EnsureProductsUpToDate();
+
             if (_shop == null)
             {
                 SetStatus("Магазин недоступен (ShopServiceBehaviour не найден).");
@@ -373,9 +379,8 @@ namespace Gironoid._Project.Code.UI.Shared
             {
                 ShopProduct p = products[i];
 
-                // Rewarded показываем отдельной кнопкой btnWatchAd (если она есть),
-                // поэтому в список кораблей можно не добавлять.
-                if (p.Kind == ShopProductKind.RewardedTokens) continue;
+                // Экран "Магазин кораблей" показывает только корабли.
+                if (p.Kind != ShopProductKind.Ship) continue;
 
                 var price = Mathf.Max(0, p.PriceTokens);
                 var title = string.IsNullOrWhiteSpace(p.Title) ? "Товар" : p.Title;
@@ -384,6 +389,7 @@ namespace Gironoid._Project.Code.UI.Shared
                 {
                     Id = p.Id,
                     Kind = p.Kind,
+                    PayloadId = p.PayloadId,
                     Title = title,
                     Description = p.Description ?? "",
                     PriceTokens = price,
@@ -393,6 +399,9 @@ namespace Gironoid._Project.Code.UI.Shared
 
             try { _shipsList?.Rebuild(); }
             catch { try { _shipsList?.RefreshItems(); } catch { } }
+
+            if (_vms.Count == 0)
+                SetStatus("Отсутствуют корабли для покупки.");
         }
 
         private void EnsureSelection()
@@ -445,11 +454,15 @@ namespace Gironoid._Project.Code.UI.Shared
 
             if (!_selected.IsValid)
             {
-                if (_lblShipName != null) _lblShipName.text = "Выберите корабль";
+                if (_lblShipName != null) _lblShipName.text = _vms.Count == 0 ? "Корабли недоступны" : "Выберите корабль";
                 if (_lblShipReq != null) _lblShipReq.text = "";
                 if (_lblShipStats != null) _lblShipStats.text = "";
                 if (_lblShipPrice != null) _lblShipPrice.text = "";
-                SetStatus(null);
+                ApplyShipIcon(null);
+                if (_vms.Count == 0)
+                    SetStatus("Отсутствуют корабли для покупки.");
+                else
+                    SetStatus(null);
                 SetBuyEnabled(false);
                 return;
             }
@@ -458,6 +471,7 @@ namespace Gironoid._Project.Code.UI.Shared
             if (_lblShipReq != null) _lblShipReq.text = ""; // оставлено под требования
             if (_lblShipStats != null) _lblShipStats.text = string.IsNullOrWhiteSpace(_selected.Description) ? "" : _selected.Description;
             if (_lblShipPrice != null) _lblShipPrice.text = _selected.PriceTokens <= 0 ? "Цена: бесплатно" : $"Цена: {_selected.PriceTokens}";
+            ApplyShipIcon(_selected.PayloadId);
 
             // Простая логика доступности по токенам
             var tokens = _shop != null ? _shop.GetTokensSafe() : 0;
@@ -637,6 +651,31 @@ namespace Gironoid._Project.Code.UI.Shared
             return price <= 0 ? "Купить" : $"Купить за {price}";
         }
 
+        private void ApplyShipIcon(string shipId)
+        {
+            if (_shipIconPreview == null)
+                return;
+
+            Sprite sprite = null;
+            if (!string.IsNullOrEmpty(shipId))
+                sprite = ShipSpriteResolver.LoadHullSprite(shipId);
+
+            if (sprite != null)
+            {
+                _shipIconPreview.style.backgroundImage = new StyleBackground(sprite);
+                _shipIconPreview.style.unityBackgroundScaleMode = ScaleMode.ScaleToFit;
+                _shipIconPreview.style.unityBackgroundImageTintColor = Color.white;
+                _shipIconPreview.style.opacity = 1f;
+            }
+            else
+            {
+                _shipIconPreview.style.backgroundImage = new StyleBackground((Sprite)null);
+                _shipIconPreview.style.unityBackgroundScaleMode = ScaleMode.ScaleToFit;
+                _shipIconPreview.style.unityBackgroundImageTintColor = new Color(1f, 1f, 1f, 0.25f);
+                _shipIconPreview.style.opacity = 0.9f;
+            }
+        }
+
         // ------------------- Events / Saving -------------------
 
         private void OnProfileChanged(Gironoid._Project.Code.Core.Profile.PlayerProfile profile)
@@ -755,6 +794,8 @@ namespace Gironoid._Project.Code.UI.Shared
                 case "interstitial_not_available": return "Interstitial-реклама недоступна.";
                 case "interstitial_cooldown": return "Рекламу можно показать позже.";
                 case "ads_service_missing": return "AdsService не найден.";
+                case "rewarded_cooldown": return "Награда за рекламу доступна раз в 5 минут.";
+                case "rewarded_not_allowed_in_gameplay": return "В геймплее rewarded отключён.";
                 case "already_owned": return "Уже куплено.";
                 default: return $"Ошибка: {err}";
             }
@@ -772,6 +813,7 @@ namespace Gironoid._Project.Code.UI.Shared
         {
             public ShopProductId Id;
             public ShopProductKind Kind;
+            public string PayloadId;
             public string Title;
             public string Description;
             public int PriceTokens;
